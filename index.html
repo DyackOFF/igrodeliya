@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ИГРОДЕЛИЯ — за столом</title>
+<style>
+  :root{
+    --bg:#0a0c0e; --line:#242c34; --txt:#e2e9ef; --dim:#7b8996;
+    --amber:#ffb340; --violet:#a97bff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; padding:40px 20px 60px;
+    background:
+      radial-gradient(1000px 600px at 50% -15%, #1b2431 0%, transparent 65%),
+      radial-gradient(700px 500px at 50% 115%, #1c1726 0%, transparent 60%),
+      var(--bg);
+    color:var(--txt); font:15px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  #lamp{position:fixed; inset:0; pointer-events:none; z-index:1;
+    background:radial-gradient(360px 360px at 50% 50%, rgba(255,190,90,.09), transparent 70%)}
+
+  header{max-width:1240px; margin:0 auto 34px; position:relative; z-index:2}
+  h1{margin:0 0 6px; font-size:32px; letter-spacing:.14em; text-transform:uppercase}
+  h1 span{color:var(--amber)}
+  .sub{color:var(--dim); font-size:13px}
+
+  .room{
+    max-width:1240px; margin:0 auto; position:relative; z-index:2;
+    display:grid; grid-template-columns:1fr 280px 1fr; gap:26px; align-items:start;
+  }
+  .side{display:flex; flex-direction:column; gap:20px}
+  .side.left{align-items:flex-end}
+  .side.right{align-items:flex-start}
+
+  .seat{display:flex; gap:14px; align-items:flex-start; max-width:470px; width:100%}
+  .side.left .seat{flex-direction:row-reverse}
+
+  .person{display:flex; flex-direction:column; align-items:center; gap:8px; flex:0 0 90px}
+  .ava{
+    width:86px; height:86px; border-radius:50%;
+    display:grid; place-items:center; font-weight:700; font-size:28px;
+    color:#0b0d0f; border:2px solid #2e3945;
+    background:linear-gradient(150deg,#ffcb6b,#e39a2b);
+    box-shadow:0 0 0 8px rgba(255,179,64,.06), 0 10px 22px rgba(0,0,0,.5);
+    transition:transform .18s;
+  }
+  .seat:hover .ava{transform:scale(1.06)}
+  .ava.v2{background:linear-gradient(150deg,#b79bff,#7d5cd6)}
+  .ava.empty{background:linear-gradient(150deg,#3c4652,#28313a); color:#8b98a6;
+    box-shadow:0 0 0 8px rgba(120,140,160,.05), 0 10px 22px rgba(0,0,0,.5)}
+  .nick{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); text-align:center}
+  .hintline{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#45505b}
+
+  /* карточка: невидима, пока не навёл на человека */
+  .bubble{
+    position:relative; flex:1; min-width:0;
+    background:linear-gradient(160deg,#161c22,#11161a);
+    border:1px solid var(--line); border-radius:14px;
+    padding:16px 18px;
+    opacity:0; visibility:hidden; transform:translateY(6px);
+    transition:opacity .2s, transform .2s, visibility .2s, border-color .2s;
+  }
+  .side.left .bubble{transform:translateX(8px)}
+  .side.right .bubble{transform:translateX(-8px)}
+  .seat:hover .bubble, .seat.open .bubble{
+    opacity:1; visibility:visible; transform:none; pointer-events:auto;
+  }
+  .seat.open .bubble{border-color:#4a5766; background:linear-gradient(160deg,#1a222a,#12181d)}
+
+  .bubble::before{
+    content:""; position:absolute; top:30px; width:10px; height:10px;
+    background:#161c22; border-left:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .side.left .bubble::before{right:-6px; transform:rotate(45deg)}
+  .side.right .bubble::before{left:-6px; transform:rotate(-135deg)}
+
+  /* клик по имени-фамилии раскрывает идею */
+  .who{
+    font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim);
+    cursor:pointer; display:inline-block; border-bottom:1px dashed transparent;
+    transition:color .15s, border-color .15s;
+  }
+  .who:hover{color:var(--amber); border-color:#5a3a1e}
+  .seat.open .who{color:var(--amber); border-color:#5a3a1e}
+  .who::after{content:" ·"; opacity:.5}
+  .name{font-size:19px; font-weight:600; margin:2px 0 2px}
+  .tagline{color:var(--amber); font-size:12.5px}
+  .muted .tagline{color:var(--dim)}
+
+  .body{display:none; padding-top:12px}
+  .seat.open .body{display:block}
+  ul{margin:0 0 12px; padding-left:16px; color:#c6d1db; font-size:13.5px}
+  li{margin-bottom:4px}
+  .tags{display:flex; flex-wrap:wrap; gap:5px}
+  .tag{font-size:10.5px; padding:3px 8px; border-radius:999px;
+    border:1px solid var(--line); color:var(--dim); background:#0e1215}
+  .tag.warn{border-color:#5a3a1e; color:var(--amber)}
+  .tag.mid{border-color:#3a3550; color:var(--violet)}
+  .more{font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#55616d;
+    padding-top:9px; margin-top:9px; border-top:1px solid #222a32}
+  .seat.open .more{display:none}
+
+  .table{
+    position:sticky; top:40px;
+    border:1px solid #2d3742; border-radius:50%/22%;
+    background:radial-gradient(circle at 50% 40%, #1e262e, #10141a 70%);
+    padding:54px 22px; text-align:center;
+    box-shadow:inset 0 0 40px rgba(0,0,0,.6), 0 18px 40px rgba(0,0,0,.45);
+  }
+  .table h2{margin:0 0 4px; font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--amber)}
+  .table p{margin:0 0 14px; font-size:12px; color:var(--dim)}
+  .table .core{font-size:13.5px; color:#cdd8e2; line-height:1.7}
+
+  footer{max-width:1240px; margin:40px auto 0; color:#5a6470; font-size:12.5px;
+    border-top:1px solid var(--line); padding-top:14px; position:relative; z-index:2}
+
+  @media(max-width:1000px){
+    .room{grid-template-columns:1fr}
+    .side.left,.side.right{align-items:stretch}
+    .side.left .seat{flex-direction:row}
+    .bubble{opacity:1; visibility:visible; transform:none}
+    .bubble::before{display:none}
+    .table{position:static; order:-1; border-radius:16px; padding:34px 22px}
+    .hintline{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="lamp"></div>
+
+<header>
+  <h1>Игро<span>делия</span></h1>
+  <div class="sub">Наведи на человека — появится карточка. Нажми на имя и фамилию — раскроется идея.</div>
+</header>
+
+<div class="room">
+
+  <div class="side left">
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava">ГБ</div>
+        <div class="nick">Гриша</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Белугин Григорий</div>
+        <div class="name">Crazy Mountaine</div>
+        <div class="tagline">«Безумная гора»</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <ul>
+            <li>Шутер, как DOOM</li>
+            <li>Развитие, как в Minecraft</li>
+            <li>Всё внутри горы, монстры</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">2D · сбоку</span>
+            <span class="tag mid">средний объём</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava">КП</div>
+        <div class="nick">Платон</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Капитонов Платон</div>
+        <div class="name">Проект</div>
+        <div class="tagline">Minecraft за базу</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <ul>
+            <li>Искра-слиток вместо незерита</li>
+            <li>Башня волшебников</li>
+            <li>Заражённый биом</li>
+            <li>Монеты и магазин</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">2D</span>
+            <span class="tag warn">большой объём</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava v2">БН</div>
+        <div class="nick">Никита</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Белугин Никита</div>
+        <div class="name">Приключение</div>
+        <div class="tagline">Вид сверху, сюжет, подземелья</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <ul>
+            <li>Разрыв, Ганон, похищение принцессы</li>
+            <li>Гонец к лучшему мечнику</li>
+            <li>Спавн — дом героя, не точка</li>
+            <li>Та же карта и подземелья</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">2D · сверху</span>
+            <span class="tag warn">чужой IP → переименовать</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="table">
+    <h2>Общее ядро</h2>
+    <p>то, к чему всё сходится</p>
+    <div class="core">
+      2D · гора и пещеры<br>
+      копание + отстрел<br>
+      прокачка<br>
+      темнота и скримеры
+    </div>
+  </div>
+
+  <div class="side right">
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava">ММ</div>
+        <div class="nick">Макар</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Масолов Макар</div>
+        <div class="name">Хоррор</div>
+        <div class="tagline">Просто чтоб были скримеры</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <ul>
+            <li>Немного хоррора</li>
+            <li>Скримеры</li>
+            <li>Тон, а не механика</li>
+          </ul>
+          <div class="tags">
+            <span class="tag">дёшево = атмосфера</span>
+            <span class="tag mid">уточнить, к чему</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava empty">И</div>
+        <div class="nick">Игорь</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Игорь</div>
+        <div class="name">Монолит головного мозга</div>
+        <div class="tagline">Предложений пока нет</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <div class="tags"><span class="tag">ждём</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="seat">
+      <div class="person">
+        <div class="ava empty">КИ</div>
+        <div class="nick">Илья</div>
+        <div class="hintline">наведи</div>
+      </div>
+      <div class="bubble">
+        <div class="who" role="button" tabindex="0">Кузнецов Илья</div>
+        <div class="name">На будущее</div>
+        <div class="tagline">Задел после Нового года</div>
+        <div class="more">нажми на имя → идея</div>
+        <div class="body">
+          <ul><li>Идеи, которые не влезают в срок</li></ul>
+          <div class="tags"><span class="tag">потом</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>
+  Вид сверху дешевле в коде, но дороже в арте. Копание + отстрел + темнота — общее ядро всех идей.
+</footer>
+
+<script>
+  const lamp = document.getElementById('lamp');
+  addEventListener('mousemove', e => {
+    lamp.style.background =
+      `radial-gradient(360px 360px at ${e.clientX}px ${e.clientY}px, rgba(255,190,90,.11), transparent 70%)`;
+  });
+
+  document.querySelectorAll('.seat .who').forEach(el => {
+    const seat = el.closest('.seat');
+    const toggle = () => seat.classList.toggle('open');
+    el.addEventListener('click', e => { e.stopPropagation(); toggle(); });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
+</script>
+</body>
+</html>
