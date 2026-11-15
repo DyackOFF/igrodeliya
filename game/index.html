@@ -1724,24 +1724,30 @@ function drawHud(){
       : 'ШАГ 3/3 · портал открылся — зайди в него';
     const lines = [
       step,
-      'НАСТРОЙКИ (Esc → Настройки): режим стрельбы, вид экрана, звук, джойстик',
-      'УПРАВЛЕНИЕ: WASD/стик — идти · мышь/правый стик — прицел · ЛКМ/RT — огонь · Esc/Start — пауза',
+      'МАГАЗИН (в меню): золото за убийства и уровни → улучшения и разблокировка оружия',
+      'ПРОКАЧКА: новый уровень героя — барабан, выбираешь модификатор или артефакт',
+      'НАСТРОЙКИ (Esc): режим стрельбы, вид экрана, звук, джойстик, громкость',
+      'УПРАВЛЕНИЕ: WASD/стик — идти · мышь/правый стик — прицел · ЛКМ/RT — огонь',
       'РЕЖИМ СТРЕЛЬБЫ: ' + (mode === 'auto' ? 'авто — герой сам бьёт ближайшего' : 'ручной — целишься и жмёшь огонь сам')
     ];
-    const lh = W < 700 ? 15 : 17;
-    const boxW = Math.min(W - 40, 700);
-    const boxH = lines.length * lh + 18;
-    const bx0 = (W - boxW) / 2, by0 = H - 40 - boxH;
-    ctx.fillStyle = 'rgba(8,12,7,.82)';
+    const boxW = Math.min(W - 32, 760);
+    let fsz = W < 700 ? 9 : 10.5;
+    ctx.font = '500 ' + fsz + 'px "Segoe UI", sans-serif';
+    let maxw = 0;
+    lines.forEach(t => { maxw = Math.max(maxw, ctx.measureText(t).width); });
+    if (maxw > boxW - 24) { fsz = Math.max(7, fsz * (boxW - 24) / maxw); }
+    const lh = Math.round(fsz * 1.55);
+    const boxH = lines.length * lh + 20;
+    const bx0 = (W - boxW) / 2, by0 = H - 42 - boxH;
+    ctx.fillStyle = 'rgba(8,12,7,.84)';
     ctx.fillRect(bx0, by0, boxW, boxH);
-    ctx.strokeStyle = 'rgba(182,212,58,.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(182,212,58,.32)'; ctx.lineWidth = 1;
     ctx.strokeRect(bx0, by0, boxW, boxH);
     ctx.textAlign = 'center';
-    const fsz = W < 700 ? 9 : 10.5;
     lines.forEach((t, i) => {
-      ctx.font = (i === 0 ? '700 ' : '500 ') + (i === 0 ? fsz + 2 : fsz) + 'px "Segoe UI", sans-serif';
+      ctx.font = (i === 0 ? '700 ' : '500 ') + (i === 0 ? fsz + 1.5 : fsz) + 'px "Segoe UI", sans-serif';
       ctx.fillStyle = i === 0 ? '#b6d43a' : '#9fb0be';
-      ctx.fillText(t, W/2, by0 + 16 + i*lh);
+      ctx.fillText(t, W/2, by0 + 17 + i*lh);
     });
     ctx.textAlign = 'left';
   }
