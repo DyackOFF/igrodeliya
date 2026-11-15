@@ -1880,32 +1880,49 @@ function drawHud(){
     const step = kills < 1 ? 'ШАГ 1/3 · двигайся: WASD или левый стик'
       : kills < 3 ? 'ШАГ 2/3 · стреляй: мышь + ЛКМ, правый стик или RT'
       : 'ШАГ 3/3 · портал открылся — зайди в него';
-    const lines = [
+    const paras = [
       step,
       'МАГАЗИН (в меню): золото за убийства и уровни → улучшения и разблокировка оружия',
       'ПРОКАЧКА: новый уровень героя — барабан, выбираешь модификатор или артефакт',
       'НАСТРОЙКИ (Esc): режим стрельбы, вид экрана, звук, джойстик, громкость',
-      'УПРАВЛЕНИЕ: WASD/стик — идти · мышь/правый стик — прицел · ЛКМ/RT — огонь',
+      'УПРАВЛЕНИЕ: WASD или стик — идти · мышь или правый стик — прицел · ЛКМ или RT — огонь',
       'РЕЖИМ СТРЕЛЬБЫ: ' + (mode === 'auto' ? 'авто — герой сам бьёт ближайшего' : 'ручной — целишься и жмёшь огонь сам')
     ];
-    const boxW = Math.min(W - 32, 760);
-    let fsz = W < 700 ? 9 : 10.5;
+    const boxW = Math.min(W - 16, 820);
+    const fsz = W < 700 ? 11 : 13;
+    const lh = Math.round(fsz * 1.45);
+    const maxW = boxW - 24;
+
     ctx.font = '500 ' + fsz + 'px "Segoe UI", sans-serif';
-    let maxw = 0;
-    lines.forEach(t => { maxw = Math.max(maxw, ctx.measureText(t).width); });
-    if (maxw > boxW - 24) { fsz = Math.max(7, fsz * (boxW - 24) / maxw); }
-    const lh = Math.round(fsz * 1.55);
-    const boxH = lines.length * lh + 20;
-    const bx0 = (W - boxW) / 2, by0 = H - 42 - boxH;
-    ctx.fillStyle = 'rgba(8,12,7,.84)';
+    const wrapped = [];
+    paras.forEach((text, i) => {
+      const words = text.split(' ');
+      let line = '';
+      words.forEach(w => {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > maxW && line){ wrapped.push({t: line, head: i === 0}); line = w; }
+        else line = test;
+      });
+      if (line) wrapped.push({t: line, head: i === 0});
+      if (i < paras.length - 1) wrapped.push({t: '', head: false, gap: true});
+    });
+
+    const boxH = wrapped.length * lh + 20;
+    const bx0 = (W - boxW) / 2, by0 = H - 34 - boxH;
+    ctx.fillStyle = 'rgba(8,12,7,.86)';
     ctx.fillRect(bx0, by0, boxW, boxH);
     ctx.strokeStyle = 'rgba(182,212,58,.32)'; ctx.lineWidth = 1;
     ctx.strokeRect(bx0, by0, boxW, boxH);
+
     ctx.textAlign = 'center';
-    lines.forEach((t, i) => {
-      ctx.font = (i === 0 ? '700 ' : '500 ') + (i === 0 ? fsz + 1.5 : fsz) + 'px "Segoe UI", sans-serif';
-      ctx.fillStyle = i === 0 ? '#b6d43a' : '#9fb0be';
-      ctx.fillText(t, W/2, by0 + 17 + i*lh);
+    let y = by0 + fsz + 8;
+    wrapped.forEach(l => {
+      if (l.t){
+        ctx.font = (l.head ? '700 ' : '500 ') + (l.head ? fsz + 1 : fsz) + 'px "Segoe UI", sans-serif';
+        ctx.fillStyle = l.head ? '#b6d43a' : '#c3ced8';
+        ctx.fillText(l.t, W/2, y);
+      }
+      y += l.gap ? Math.round(lh * .5) : lh;
     });
     ctx.textAlign = 'left';
   }
