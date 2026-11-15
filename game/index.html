@@ -43,7 +43,7 @@
   button.on{border-color:var(--lime);color:var(--lime);background:#16200f}
 
   .panel{z-index:2;background:rgba(10,14,9,.94);border:1px solid #2b3a20;border-radius:16px;
-    padding:18px;max-width:min(820px,95vw);width:100%;max-height:94vh;overflow:auto}
+    padding:18px;max-width:min(820px,95vw);width:100%;max-height:94vh;overflow-y:auto;overflow-x:hidden}
   .panel h2{margin:0 0 3px;font-size:clamp(17px,3vw,23px);letter-spacing:.1em;text-transform:uppercase}
   .panel p{margin:0 0 12px;color:var(--dim);font-size:13px}
 
@@ -69,8 +69,8 @@
   .goldbar{display:flex;gap:14px;justify-content:center;color:var(--amber);font-size:13px;letter-spacing:.05em;margin-bottom:8px}
 
   /* барабан */
-  .reelWrap{position:relative;width:min(680px,92vw);overflow:hidden;
-    border-top:1px solid #2b3a20;border-bottom:1px solid #2b3a20;padding:10px 0;margin-bottom:12px}
+  .reelWrap{position:relative;width:100%;max-width:680px;overflow:hidden;
+    border-top:1px solid #2b3a20;border-bottom:1px solid #2b3a20;padding:10px 0;margin:0 auto 12px}
   .reelWrap::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;
     background:linear-gradient(180deg,transparent,#b6d43a,transparent);transform:translateX(-1px);z-index:2;opacity:.5}
   .strip{display:flex;gap:8px;will-change:transform}
@@ -488,7 +488,8 @@ function startLevel(i){
   if (L.boss) spawnBoss(L.boss, L.bossName);
   cam.x = clamp(P.x-W/2, 0, MAP_W*TS-W);
   cam.y = clamp(P.y-H/2, 0, MAP_H*TS-H);
-  toast = ''; toastT = 0;
+  toast = L.boss ? ('БОСС · ' + L.bossName) : (lvl > 0 ? 'УРОВЕНЬ ' + (lvl+1) + ' · ' + L.biomeName : '');
+  toastT = toast ? 4 : 0;
 }
 
 // ================= КОЛЛИЗИИ =================
@@ -657,15 +658,30 @@ function spinReel(){
   const center = (strip.parentElement.clientWidth || 680)/2 - 66;
   const target = -(FINAL_IDX*cardW) + center;
 
-  // принудительный reflow + двойной кадр, иначе браузер не начинает transition
+  // Web Animations API — надёжнее CSS-transition
+  if (strip.getAnimations) strip.getAnimations().forEach(a => a.cancel());
+  strip.style.transition = 'none';
+  strip.style.transform = 'translateX(0px)';
   void strip.offsetWidth;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+
+  const frames = [{transform:'translateX(0px)'}, {transform:`translateX(${target}px)`}];
+  const opts = {duration: dur, easing:'cubic-bezier(.1,.74,.15,1)', fill:'forwards'};
+  if (strip.animate){
+    const anim = strip.animate(frames, opts);
+    anim.onfinish = () => {
+      strip.style.transition = 'none';
+      strip.style.transform = `translateX(${target}px)`;
+      try { anim.cancel(); } catch(e){}
+    };
+  } else {
     strip.style.transition = `transform ${dur}ms cubic-bezier(.1,.74,.15,1)`;
     strip.style.transform = `translateX(${target}px)`;
-  }));
+  }
 
   setTimeout(() => {
     reelAnimating = false;
+    strip.style.transition = 'none';
+    strip.style.transform = `translateX(${target}px)`;
     const d = drumItem.data;
     const isArt = drumItem.kind === 'artifact';
 
@@ -1103,7 +1119,7 @@ function update(dt){
   // бесконечный спавн до квоты
   const alive = enemies.filter(e => !e.boss).length;
   const L = LEVELS[lvl];
-  if (kills < quota && alive < L.maxAlive){
+  if (!portal && kills < quota && alive < L.maxAlive){
     spawnTimer -= dt;
     if (spawnTimer <= 0){
       spawnEnemy(L.types[Math.floor(Math.random()*L.types.length)]);
@@ -1437,6 +1453,7 @@ function boot(){
   setMode(useTouch ? 'auto' : 'manual');
   refreshMenu();
   if (location.hash === '#play'){ meta.weapon='pistol'; startGame(); }
+  if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
   requestAnimationFrame(loop);
 }
 
@@ -1444,7 +1461,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  startGame, startLevel, update, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
+  startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
   keyDown(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
