@@ -150,7 +150,8 @@
 
 <div id="hudbtns">
   <button id="btnPause" title="Пауза">II</button>
-  <button id="btnSound" title="Звук">♪</button>
+  <button id="btnSound" title="Звуки">♪</button>
+  <button id="btnMusicHud" title="Музыка">♫</button>
   <button id="btnFull" title="На весь экран">⛶</button>
 </div>
 
@@ -343,7 +344,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.4.0 (16.11)';
+const VERSION = 'v1.4.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1387,9 +1388,21 @@ function syncSettings(){
   $('musLabel').textContent = (meta.musicVol === undefined ? 35 : meta.musicVol) + '%';
   $('btnMusic').textContent = meta.music === 0 ? 'Вкл' : 'Выкл';
   $('btnShots').textContent = meta.shotSound === 0 ? 'Включить' : 'Выключить';
+  const sb = $('btnSound'), mb = $('btnMusicHud');
+  if (sb) sb.textContent = meta.sound === 0 ? '♪̸' : '♪';
+  if (sb) sb.style.opacity = meta.sound === 0 ? .45 : 1;
+  if (mb) mb.textContent = meta.music === 0 ? '♫̸' : '♫';
+  if (mb) mb.style.opacity = meta.music === 0 ? .45 : 1;
 }
 $('btnPause').onclick = () => togglePause();
 $('btnSound').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; meta.vol = meta.vol || 60; saveMeta(); syncSettings(); sfx('click'); };
+$('btnMusicHud').onclick = () => {
+  meta.music = meta.music === 0 ? 1 : 0;
+  if (meta.music && meta.musicVol === 0) meta.musicVol = 35;
+  saveMeta(); syncSettings();
+  if (meta.music === 0) stopMusic(); else if (state === 'play') startMusic();
+  sfx('click');
+};
 $('btnFull').onclick = () => {
   try {
     if (!document.fullscreenElement) (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (()=>{})).call(document.documentElement);
