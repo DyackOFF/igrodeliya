@@ -341,7 +341,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.2.0 (16.11)';
+const VERSION = 'v1.3.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -774,11 +774,11 @@ const ITEMS = [
   {id:'magnet', r:'rare',   ic:'◎', name:'Магнит опыта',      desc:'+40% опыта', max:4, apply:p=>p.xpMul+=.4},
   {id:'regen',  r:'rare',   ic:'✚', name:'Регенерация',       desc:'+1 HP в секунду', max:4, apply:p=>p.regen+=1},
   {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+3 HP за убийство', max:3, apply:p=>p.vamp+=3},
-  {id:'slow',   r:'rare',   ic:'❄', name:'Замедление',        desc:'Пули замедляют врагов', max:2, apply:p=>p.slow+=1},
-  {id:'poison', r:'rare',   ic:'☠', name:'Яд',                desc:'Пули отравляют врагов', max:3, apply:p=>p.poison+=1},
+  {id:'slow',   r:'rare',   ic:'❄', name:'Замедление',        desc:'Замедляет сильнее с каждым уровнем', max:2, apply:p=>p.slow+=1},
+  {id:'poison', r:'rare',   ic:'☠', name:'Яд',                desc:'Сильнее и дольше с каждым уровнем, облако больше', max:3, apply:p=>p.poison+=1},
   {id:'multi',  r:'epic',   ic:'≡', name:'Раздвоение',        desc:'+1 пуля в залпе', max:4, apply:p=>p.extraShots++},
-  {id:'thorns', r:'epic',   ic:'✸', name:'Шипы',              desc:'Враги получают урон в упор', max:3, apply:p=>p.thorns+=14},
-  {id:'knock',  r:'epic',   ic:'⇱', name:'Отдача',            desc:'Пули отталкивают врагов', max:3, apply:p=>p.knock+=40},
+  {id:'thorns', r:'epic',   ic:'✸', name:'Шипы',              desc:'Враги получают урон в упор (+16 за уровень)', max:3, apply:p=>p.thorns+=16},
+  {id:'knock',  r:'epic',   ic:'⇱', name:'Отдача',            desc:'Пули сильнее отталкивают (+55)', max:3, apply:p=>p.knock+=55},
   {id:'orb',    r:'epic',   ic:'◍', name:'Орбита',            desc:'+1 шар кружит вокруг тебя', max:3, apply:p=>p.orbs++},
   {id:'shield', r:'epic',   ic:'◌', name:'Щит',               desc:'Щит гасит удар, восстанавливается', max:2, apply:p=>p.shieldMax+=1},
   {id:'ricochet',r:'epic',  ic:'↺', name:'Рикошет',           desc:'Пули отскакивают от стен', max:1, unique:true, apply:p=>p.ricochet=true},
@@ -1025,9 +1025,11 @@ function spinReel(){
   strip.innerHTML = cards.map(c => {
     const d = c.data;
     const cls = c.kind === 'artifact' ? 'artifact' : (d.r || 'common');
+    const cur = c.kind === 'artifact' ? 1 : (stacks[d.id] || 0) + 1;
+    const lvlTxt = (c.kind !== 'artifact' && d.max > 1) ? ` · ур. ${cur}/${d.max}` : '';
     return `<div class="slot ${cls}"><span class="rar">${RAR_NAME[cls]}</span>
       <img class="ico" src="icons/${d.id}.png" alt="" onerror="this.style.display='none'">
-      <h4>${d.name}</h4><p>${d.desc||''}</p></div>`;
+      <h4>${d.name}</h4><p>${(d.desc||'') + lvlTxt}</p></div>`;
   }).join('');
 
   const cardW = 140;
@@ -1435,7 +1437,7 @@ function update(dt){
   if (P.iframe > 0) P.iframe -= dt;
   if (tutorial) P.hp = P.maxHp;
   if (P.regen) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
-  if (P.shieldMax && P.shield < P.shieldMax){ P.shieldT += dt; if (P.shieldT >= 12){ P.shieldT = 0; P.shield++; } }
+  if (P.shieldMax && P.shield < P.shieldMax){ P.shieldT += dt; if (P.shieldT >= Math.max(6, 12 - 2*P.shieldMax)){ P.shieldT = 0; P.shield++; } }
   if (toastT > 0) toastT -= dt;
 
   let vx = input.moveX, vy = input.moveY;
@@ -1517,7 +1519,10 @@ function update(dt){
             }
           }
         }
-        if (P.poison){ en.poisonT = 2.5; en.poisonDmg = Math.max(en.poisonDmg, b.dmg*.18*P.poison); }
+        if (P.poison){
+          en.poisonT = 2.4 + .9*P.poison;
+          en.poisonDmg = Math.max(en.poisonDmg, b.dmg * (0.15 + 0.12*P.poison));
+        }
         if (P.knock){ const a3 = Math.atan2(en.y-b.y, en.x-b.x);
           moveWithCollision(en, Math.cos(a3)*P.knock*dt*4, Math.sin(a3)*P.knock*dt*4); }
         b.hit.add(en);
@@ -1547,7 +1552,7 @@ function update(dt){
 
     const dx = P.x-en.x, dy = P.y-en.y, d = Math.hypot(dx,dy)||1;
     const ux = dx/d, uy = dy/d;
-    const slowMul = en.slowT > 0 ? .55 : 1;
+    const slowMul = en.slowT > 0 ? Math.max(.28, .55 - .11*Math.max(0, P.slow-1)) : 1;
     const tgt = flowTarget(en);
     const tx = tgt ? tgt.x : P.x, ty = tgt ? tgt.y : P.y;
     const tdx = tx-en.x, tdy = ty-en.y, td = Math.hypot(tdx,tdy)||1;
@@ -1599,7 +1604,7 @@ function update(dt){
       gainXp(Math.round(en.xp * P.xpMul));
       parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
       if (en.poisonT > 0){
-        clouds.push({x:en.x, y:en.y, r:78, life:2, max:2, tick:0, dmg:6 + 5*(P.poison||1)});
+        clouds.push({x:en.x, y:en.y, r:68 + 14*(P.poison||1), life:2, max:2, tick:0, dmg:5 + 5*(P.poison||1)});
         sfx('poison');
       }
       if (en.boss){ bossRef = null; addGold(40 + lvl*8); }
