@@ -148,6 +148,7 @@
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
   <div class="btns">
     <button class="primary" id="btnPlay">Играть</button>
+    <button id="btnTutorial">Обучение</button>
     <button id="btnShop">Магазин</button>
     <button id="btnRecords">Мои рекорды</button>
     <button id="btnSettings">Настройки</button>
@@ -618,6 +619,7 @@ let P, bullets, ebullets, enemies, parts, map, MAP_W, MAP_H, cam,
     lvl, kills, levelTime, xp, xpNeed, plvl, stacks, bossRef, portal, toast, toastT,
     quota, spawnTimer, flow, flowT, rerolls, drumItem, drumOpen;
 let mode = 'manual';
+let tutorial = false;
 let useTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 let forceTouch = null;
 
@@ -1168,6 +1170,31 @@ $('btnTouchForce').onclick = () => {
   updateTouchVisibility();
 };
 
+function startTutorial(){
+  resetGame();
+  tutorial = true;
+  map = genMap(22, 15, 777);
+  MAP_W = 22; MAP_H = 15;
+  P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
+  cam = {x:0, y:0};
+  quota = 3; kills = 0; levelTime = 0;
+  bullets = []; ebullets = []; enemies = []; parts = []; portal = null; bossRef = null;
+  spawnTimer = 999; flow = null; flowT = 0;
+  for (let i = 0; i < 3; i++) spawnEnemy('slime');
+  cam.x = clamp(P.x - W/2, 0, Math.max(0, MAP_W*TS - W));
+  cam.y = clamp(P.y - H/2, 0, Math.max(0, MAP_H*TS - H));
+  ['menu','shop','settings','devs','help','levelend','final','pick','records','pause'].forEach(hide);
+  state = 'play';
+  showHud(true);
+  updateTouchVisibility();
+}
+function endTutorial(){
+  tutorial = false;
+  state = 'menu';
+  show('menu'); showHud(false); refreshMenu(); updateTouchVisibility();
+}
+$('btnTutorial').onclick = () => { sfx('click'); startTutorial(); };
+
 function startGame(){
   resetGame();
   $('btnNext').onclick = () => nextLevel();
@@ -1182,6 +1209,7 @@ function startGame(){
 function update(dt){
   levelTime += dt; P.t += dt;
   if (P.iframe > 0) P.iframe -= dt;
+  if (tutorial) P.hp = P.maxHp;
   if (P.regen) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
   if (P.shieldMax && P.shield < P.shieldMax){ P.shieldT += dt; if (P.shieldT >= 12){ P.shieldT = 0; P.shield++; } }
   if (toastT > 0) toastT -= dt;
@@ -1339,7 +1367,7 @@ function update(dt){
   // бесконечный спавн до квоты
   const alive = enemies.filter(e => !e.boss).length;
   const L = LEVELS[lvl];
-  if (!portal && kills < quota && alive < L.maxAlive){
+  if (!tutorial && !portal && kills < quota && alive < L.maxAlive){
     spawnTimer -= dt;
     if (spawnTimer <= 0){
       spawnEnemy(L.types[Math.floor(Math.random()*L.types.length)]);
@@ -1358,7 +1386,10 @@ function update(dt){
   }
   if (portal){
     portal.t += dt;
-    if (Math.hypot(P.x-portal.x, P.y-portal.y) < 42) enterPortal();
+    if (Math.hypot(P.x-portal.x, P.y-portal.y) < 42){
+      if (tutorial){ endTutorial(); return; }
+      enterPortal();
+    }
   }
 
   for (let i = parts.length-1; i >= 0; i--){ parts[i].life -= dt; if (parts[i].life <= 0) parts.splice(i,1); }
@@ -1414,6 +1445,7 @@ function addGold(n){
   if (whole > 0){ meta.gold += whole; meta.goldAcc -= whole; }
 }
 function gainXp(n){
+  if (tutorial) return;
   xp += n;
   if (xp >= xpNeed){
     xp -= xpNeed; plvl++; xpNeed = Math.round(xpNeed*1.42);
@@ -1658,6 +1690,23 @@ function drawHud(){
     ctx.fillText(bossRef.name, W/2, y2-6);
   }
 
+  if (tutorial){
+    const step = kills < 1 ? '1/3 · WASD или стик — двигайся'
+      : kills < 3 ? '2/3 · Мышь + ЛКМ или правый стик — стреляй по слизням'
+      : '3/3 · Портал открылся — зайди в него';
+    ctx.textAlign='center';
+    ctx.font = '600 ' + (W<700?12:14) + 'px "Segoe UI", sans-serif';
+    const tw = ctx.measureText(step).width + 26;
+    ctx.fillStyle = 'rgba(10,14,9,.78)';
+    ctx.fillRect(W/2 - tw/2, H - 92, tw, 30);
+    ctx.fillStyle = '#b6d43a';
+    ctx.fillText(step, W/2, H - 72);
+    ctx.fillStyle = '#7b8996';
+    ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
+    ctx.fillText('обучение · Esc — выход', W/2, H - 54);
+    ctx.textAlign='left';
+  }
+
   const xw = Math.min(520, W*.56), xh = 6, xx = (W-xw)/2, xy = H-16;
   ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(xx,xy,xw,xh);
   ctx.fillStyle='#b6d43a'; ctx.fillRect(xx,xy,xw*Math.min(1,xp/xpNeed),xh);
@@ -1691,7 +1740,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get mode(){ return mode; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
+  get mode(){ return mode; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
