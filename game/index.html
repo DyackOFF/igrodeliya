@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.9.2 (16.11)';
+const VERSION = 'v1.9.3 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1874,13 +1874,11 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
     }
   } else if (en.bossKind === 'charge'){
     if (en.dashT > 0){
-      // рывок: без разгона, но с каждым отскоком всё медленнее
+      // рывок с постоянной скоростью, отскоки гасят её внутри атаки
       en.dashT -= dt;
       const nx = en.x + en.dashVX*dt, ny = en.y + en.dashVY*dt;
-      if (canStand(nx, en.y, en.r)) en.x = nx;
-      else { en.dashVX *= -0.72; en.chargeFatigue = Math.max(0.28, (en.chargeFatigue || 1) * 0.88); }
-      if (canStand(en.x, ny, en.r)) en.y = ny;
-      else { en.dashVY *= -0.72; en.chargeFatigue = Math.max(0.28, (en.chargeFatigue || 1) * 0.88); }
+      if (canStand(nx, en.y, en.r)) en.x = nx; else { en.dashVX *= -0.72; }
+      if (canStand(en.x, ny, en.r)) en.y = ny; else { en.dashVY *= -0.72; }
       if (Math.random() < .5) parts.push({x:en.x, y:en.y, life:.25, max:.25, kind:'dust'});
     } else if (en.windT > 0){
       // копит разгон на месте
@@ -1888,8 +1886,7 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
       if (Math.random() < .45) parts.push({x:en.x + (Math.random()-.5)*70, y:en.y + (Math.random()-.5)*70, life:.3, max:.3, kind:'dust'});
       if (en.windT <= 0){
         en.dashT = 1.2;
-        const v = 620 * (en.chargeFatigue || 1);
-        en.dashVX = ux*v; en.dashVY = uy*v;
+        en.dashVX = ux*460; en.dashVY = uy*460;
       }
     } else if (en.cd <= 0){
       en.cd = 2.2; en.windT = .9;
