@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.9.1 (16.11)';
+const VERSION = 'v1.9.2 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1788,10 +1788,15 @@ function update(dt){
       if (en.boss){
         bossRef = null;
         addGold(40 + lvl*8);
-        // после смерти босса — обычная квота на добивание
-        kills = 0;
-        quota = LEVELS[lvl].quota;
-        toast = 'ДОБЕЙ ОСТАВШИХСЯ'; toastT = 3;
+        if (tutorial){
+          kills = quota;                 // в обучении портал сразу после босса
+          toast = 'БОСС ПОБЕЖДЁН'; toastT = 2.5;
+        } else {
+          // после смерти босса — обычная квота на добивание
+          kills = 0;
+          quota = LEVELS[lvl].quota;
+          toast = 'ДОБЕЙ ОСТАВШИХСЯ'; toastT = 3;
+        }
       }
       if (state !== 'play') return;
       continue;
@@ -2374,7 +2379,7 @@ window.__game = {
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
-  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables,
+  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial,
   debugSetKills(n){ kills = n; }
 };
 })();
