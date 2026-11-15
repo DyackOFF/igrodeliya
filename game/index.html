@@ -654,13 +654,15 @@ function spinReel(){
   }).join('');
 
   const cardW = 140;
-  const center = $('strip').parentElement.clientWidth/2 - 66;
+  const center = (strip.parentElement.clientWidth || 680)/2 - 66;
   const target = -(FINAL_IDX*cardW) + center;
 
-  requestAnimationFrame(() => {
+  // принудительный reflow + двойной кадр, иначе браузер не начинает transition
+  void strip.offsetWidth;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     strip.style.transition = `transform ${dur}ms cubic-bezier(.1,.74,.15,1)`;
     strip.style.transform = `translateX(${target}px)`;
-  });
+  }));
 
   setTimeout(() => {
     reelAnimating = false;
