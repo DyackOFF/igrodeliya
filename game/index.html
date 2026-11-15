@@ -1775,6 +1775,41 @@ function render(){
   ctx.lineTo(P.x-cam.x+Math.cos(P.aim)*26, P.y-cam.y+Math.sin(P.aim)*26);
   ctx.stroke();
 
+  // прицел: линия полёта пуль и маркер
+  {
+    let tx, ty;
+    if (mode === 'auto'){
+      const en = nearestEnemy();
+      if (en){ tx = en.x - cam.x; ty = en.y - cam.y; }
+      else { tx = P.x - cam.x + Math.cos(P.aim)*260; ty = P.y - cam.y + Math.sin(P.aim)*260; }
+    } else {
+      tx = mouse.x; ty = mouse.y;
+    }
+    const px0 = P.x - cam.x, py0 = P.y - cam.y;
+
+    // трасса
+    ctx.save();
+    ctx.setLineDash([7, 9]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(182,212,58,.35)';
+    ctx.beginPath(); ctx.moveTo(px0, py0); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.restore();
+
+    // маркер
+    const pulse = 1 + Math.sin(performance.now ? performance.now()/220 : 0) * .08;
+    ctx.strokeStyle = 'rgba(182,212,58,.85)';
+    ctx.lineWidth = 2;
+    const r = 11 * pulse;
+    ctx.beginPath(); ctx.arc(tx, ty, r, 0, 6.3); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tx - r - 6, ty); ctx.lineTo(tx - r + 2, ty);
+    ctx.moveTo(tx + r - 2, ty); ctx.lineTo(tx + r + 6, ty);
+    ctx.moveTo(tx, ty - r - 6); ctx.lineTo(tx, ty - r + 2);
+    ctx.moveTo(tx, ty + r - 2); ctx.lineTo(tx, ty + r + 6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,179,64,.9)';
+    ctx.beginPath(); ctx.arc(tx, ty, 2, 0, 6.3); ctx.fill();
+  }
   // оружие в руках
   {
     const art = WEAPON_ART[P.weapon] || WEAPON_ART.pistol;
@@ -1941,6 +1976,7 @@ function loop(now){
   const dt = Math.min((now-last)/1000 || 0, .05);
   last = now;
   if (state === 'play'){ pollPad(); update(dt); }
+  cvs.style.cursor = (state === 'play' && mode === 'manual') ? 'none' : 'default';
   if (state === 'play' || state === 'pause' || state === 'levelend' || state === 'over' || state === 'win' ||
       state === 'drum' || state === 'artifact') render();
   requestAnimationFrame(loop);
