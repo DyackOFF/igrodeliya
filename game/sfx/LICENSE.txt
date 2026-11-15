@@ -1,0 +1,16 @@
+Звуковые эффекты в папке sfx/ взяты из бесплатных наборов Kenney (www.kenney.nl):
+
+- Kenney Impact Sounds — https://kenney.nl/assets/impact-sounds
+- Kenney Digital Audio — https://kenney.nl/assets/digital-audio
+
+Лицензия: Creative Commons Zero (CC0 1.0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Можно использовать в личных, учебных и коммерческих проектах без указания автора
+(указание приветствуется, но не обязательно).
+
+Файлы:
+impactWood_light_000.ogg, impactWood_medium_000.ogg, impactWood_heavy_000.ogg,
+impactMetal_light_000.ogg, impactMetal_heavy_000.ogg, impactGeneric_light_000.ogg,
+impactGlass_light_000.ogg — Kenney Impact Sounds
+laser1.ogg, laser2.ogg, laser3.ogg, laser4.ogg, pepSound1.ogg — Kenney Digital Audio
