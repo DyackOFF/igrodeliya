@@ -483,7 +483,8 @@ function startLevel(i){
   bullets=[]; ebullets=[]; enemies=[]; parts=[]; bossRef=null; portal=null;
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
-  P.hp = Math.min(P.maxHp, P.hp + 15 + 15*upLvl('heal'));
+  // здоровье между уровнями НЕ восстанавливается само — только за улучшение «Лечение»
+  P.hp = Math.min(P.maxHp, P.hp + 15*upLvl('heal'));
   P.shield = P.shieldMax;
   if (L.boss) spawnBoss(L.boss, L.bossName);
   cam.x = clamp(P.x-W/2, 0, MAP_W*TS-W);
