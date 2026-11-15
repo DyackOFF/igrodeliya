@@ -139,6 +139,8 @@
 
   .hintbar{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:3;
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#46525d;pointer-events:none;text-align:center}
+  .kbd-focus{outline:2px solid #b6d43a !important;outline-offset:2px;
+    box-shadow:0 0 18px rgba(182,212,58,.45) !important}
   input[type=text]{font:inherit;padding:9px 12px;border-radius:9px;border:1px solid #3a4a26;
     background:#10160e;color:var(--txt);width:220px;text-align:center}
 </style>
@@ -341,14 +343,14 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.3.0 (16.11)';
+const VERSION = 'v1.4.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
-const show = id => $(id).classList.remove('hidden');
+const show = id => { $(id).classList.remove('hidden'); try { resetKbd(); } catch(e){} };
 const hide = id => $(id).classList.add('hidden');
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
 
@@ -1156,6 +1158,15 @@ const MOVE_CODES = {KeyW:'up', KeyA:'left', KeyS:'down', KeyD:'right', ArrowUp:'
 
 addEventListener('keydown', e => {
   const dir = MOVE_CODES[e.code];
+  const anyScreen = document.querySelector('.screen:not(.hidden)');
+
+  if (anyScreen){
+    if (e.code === 'ArrowDown' || e.code === 'ArrowRight' || e.code === 'KeyS' || e.code === 'KeyD'){ kbdMove(1); e.preventDefault(); return; }
+    if (e.code === 'ArrowUp' || e.code === 'ArrowLeft' || e.code === 'KeyW' || e.code === 'KeyA'){ kbdMove(-1); e.preventDefault(); return; }
+    if (e.code === 'Enter' || e.code === 'Space'){ kbdActivate(); e.preventDefault(); return; }
+    if (e.code === 'Escape'){ escapeScreen(); e.preventDefault(); return; }
+  }
+
   if (dir) { keys.add(dir); e.preventDefault(); }
   if (e.code === 'Space'){ keys.add(' '); e.preventDefault(); }
   if (e.code === 'Escape'){ if (state === 'play' || state === 'pause'){ e.preventDefault(); togglePause(); } }
@@ -1220,6 +1231,64 @@ fireBtn.addEventListener('pointerup', () => input.fireHeld = false);
 fireBtn.addEventListener('pointerleave', () => input.fireHeld = false);
 
 // ================= МЕНЮ =================
+// ---------- клавиатурная навигация по меню ----------
+let kbdEl = null;
+function focusables(){
+  const screens = [...document.querySelectorAll('.screen')].filter(s => !s.classList.contains('hidden'));
+  if (!screens.length) return [];
+  const root = screens[screens.length - 1];
+  return [...root.querySelectorAll('button, input, .card')].filter(el => !el.disabled && el.offsetParent !== null);
+}
+function setKbd(el){
+  if (kbdEl) kbdEl.classList.remove('kbd-focus');
+  kbdEl = el;
+  if (el){
+    el.classList.add('kbd-focus');
+    try { el.focus({ preventScroll: true }); } catch(err){}
+  }
+}
+function kbdMove(d){
+  const list = focusables();
+  if (!list.length) return;
+  let i = list.indexOf(kbdEl);
+  if (i < 0) i = d > 0 ? -1 : 0;
+  i = (i + d + list.length) % list.length;
+  setKbd(list[i]);
+  sfx('click');
+}
+function kbdActivate(){
+  const list = focusables();
+  if (!list.length) return;
+  const el = (kbdEl && list.indexOf(kbdEl) >= 0) ? kbdEl : list[0];
+  if (el.tagName === 'INPUT'){
+    const rng = el;
+    rng.value = Math.min(100, (+rng.value || 0) + 10);
+    rng.dispatchEvent(new Event('input', {bubbles:true}));
+    rng.oninput && rng.oninput({ target: rng });
+    return;
+  }
+  el.click();
+}
+function resetKbd(){
+  kbdEl = null;
+  const list = focusables();
+  if (list.length) setKbd(list[0]);
+}
+function escapeScreen(){
+  if (!$('settings').classList.contains('hidden')){
+    hide('settings');
+    if (settingsFrom === 'pause') show('pause'); else { show('menu'); refreshMenu(); }
+    resetKbd(); return;
+  }
+  if (!$('pause').classList.contains('hidden')){ togglePause(); return; }
+  if (!$('pick').classList.contains('hidden')){ hide('pick'); show('menu'); refreshMenu(); resetKbd(); return; }
+  if (!$('shop').classList.contains('hidden')){ hide('shop'); show('menu'); refreshMenu(); resetKbd(); return; }
+  if (!$('records').classList.contains('hidden')){ hide('records'); show('menu'); refreshMenu(); resetKbd(); return; }
+  if (!$('devs').classList.contains('hidden')){ hide('devs'); show('menu'); resetKbd(); return; }
+  if (!$('help').classList.contains('hidden')){ hide('help'); show('menu'); resetKbd(); return; }
+  if (state === 'play') togglePause();
+}
+
 function refreshMenu(){
   $('menuGold').textContent = 'Золото: ' + meta.gold;
   $('menuBest').textContent = 'Рекорд: ' + (meta.best ? 'уровень ' + meta.best : '—');
@@ -1700,6 +1769,17 @@ function hurtPlayer(dmg){
   P.hp -= dmg*(1-Math.min(.8,P.armor));
   P.iframe = .7;
   parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'});
+  parts.push({x:P.x,y:P.y,life:.35,max:.35,kind:'shock',size:130});
+  // ударная волна: отталкиваем врагов вокруг
+  for (const en of enemies){
+    const d = Math.hypot(en.x-P.x, en.y-P.y);
+    if (d < 150 && !en.boss){
+      const a = Math.atan2(en.y-P.y, en.x-P.x);
+      const push = (150 - d) * .9;
+      moveWithCollision(en, Math.cos(a)*push, Math.sin(a)*push);
+      en.slowT = Math.max(en.slowT, .5);
+    }
+  }
   if (P.hp <= 0) gameOver();
 }
 function explode(x,y,dmg,r){
@@ -1966,6 +2046,13 @@ function render(){
       ctx.beginPath(); ctx.arc(px, py, 6 + prog*20, 0, 6.3); ctx.fill();
       ctx.globalAlpha = 1;
     }
+    else if (p.kind==='shock'){
+      const prog = 1 - k;
+      ctx.globalAlpha = k * .5;
+      ctx.strokeStyle = '#ffb340'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py, 20 + prog*(p.size||120), 0, 6.3); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   const fog = .45 + (L.fog||0);
@@ -2132,6 +2219,7 @@ window.__game = {
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
+  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables,
   debugSetKills(n){ kills = n; }
 };
 })();
