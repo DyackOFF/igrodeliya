@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.9.0 (16.11)';
+const VERSION = 'v1.9.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -980,7 +980,7 @@ function spawnBoss(kind, name){
   bossRef = {
     x:pos.x, y:pos.y, type:'boss', bossKind:kind, name:name||'Босс', t:0,
     r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48, xp:150,
-    flash:0, phase:0, cd:1.5, dashT:0, windT:0, dashVX:0, dashVY:0,
+    flash:0, phase:0, cd:1.5, dashT:0, windT:0, dashVX:0, dashVY:0, chargeFatigue:1,
     slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0
   };
   enemies.push(bossRef);
@@ -1869,19 +1869,23 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
     }
   } else if (en.bossKind === 'charge'){
     if (en.dashT > 0){
-      // разгон и рикошет от стен
+      // рывок: без разгона, но с каждым отскоком всё медленнее
       en.dashT -= dt;
-      en.dashVX *= (1 + 2.4*dt);
-      en.dashVY *= (1 + 2.4*dt);
       const nx = en.x + en.dashVX*dt, ny = en.y + en.dashVY*dt;
-      if (canStand(nx, en.y, en.r)) en.x = nx; else { en.dashVX *= -0.96; }
-      if (canStand(en.x, ny, en.r)) en.y = ny; else { en.dashVY *= -0.96; }
+      if (canStand(nx, en.y, en.r)) en.x = nx;
+      else { en.dashVX *= -0.72; en.chargeFatigue = Math.max(0.28, (en.chargeFatigue || 1) * 0.88); }
+      if (canStand(en.x, ny, en.r)) en.y = ny;
+      else { en.dashVY *= -0.72; en.chargeFatigue = Math.max(0.28, (en.chargeFatigue || 1) * 0.88); }
       if (Math.random() < .5) parts.push({x:en.x, y:en.y, life:.25, max:.25, kind:'dust'});
     } else if (en.windT > 0){
       // копит разгон на месте
       en.windT -= dt;
       if (Math.random() < .45) parts.push({x:en.x + (Math.random()-.5)*70, y:en.y + (Math.random()-.5)*70, life:.3, max:.3, kind:'dust'});
-      if (en.windT <= 0){ en.dashT = 1.5; en.dashVX = ux*300; en.dashVY = uy*300; }
+      if (en.windT <= 0){
+        en.dashT = 1.2;
+        const v = 620 * (en.chargeFatigue || 1);
+        en.dashVX = ux*v; en.dashVY = uy*v;
+      }
     } else if (en.cd <= 0){
       en.cd = 2.2; en.windT = .9;
     } else {
