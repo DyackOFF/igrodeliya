@@ -174,7 +174,7 @@
     </div>
   </div>
   <h1>Crazy <em>Mountaine</em></h1>
-  <div class="tag">30 уровней · 6 боссов · гимназия им. Н.В. Пушкова</div>
+  <div class="tag"><span id="verTag">v0.0</span> · 30 уровней · 6 боссов · гимназия им. Н.В. Пушкова</div>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
   <div class="btns">
     <button class="primary" id="btnPlay">Играть</button>
@@ -256,7 +256,7 @@
 <div id="pause" class="screen hidden">
   <div class="panel" style="max-width:380px">
     <h2>Пауза</h2>
-    <p>Игра остановлена</p>
+    <p>Игра остановлена · <span id="pauseVer">v0.0</span></p>
     <div class="btns" style="width:100%">
       <button class="primary" id="btnResume">Продолжить</button>
       <button id="btnPauseSettings">Настройки</button>
@@ -341,6 +341,7 @@
 (() => {
 "use strict";
 
+const VERSION = 'v1.0.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1985,6 +1986,8 @@ function loop(now){
 }
 function boot(){
   resetGame();
+  $('verTag').textContent = VERSION;
+  $('pauseVer').textContent = VERSION;
   applyLayout();
   setMode(useTouch ? 'auto' : 'manual');
   syncSettings();
