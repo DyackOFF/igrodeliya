@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.7.0 (16.11)';
+const VERSION = 'v1.7.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -975,8 +975,8 @@ function spawnEnemy(type, near){
 }
 function spawnBoss(kind, name){
   const pos = randomFloorFar(320);
-  let hp = 500 * (1 + lvl*0.18);
-  if (kind === 'charge') hp *= 3;      // Камнеед толще остальных
+  // все боссы втрое толще обычного
+  const hp = 500 * (1 + lvl*0.18) * 3;
   bossRef = {
     x:pos.x, y:pos.y, type:'boss', bossKind:kind, name:name||'Босс', t:0,
     r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48, xp:150,
