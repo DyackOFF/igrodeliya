@@ -542,10 +542,15 @@ function flowTarget(en){
 
 // ================= СПАВН =================
 function randomFloorFar(minD){
-  for (let t = 0; t < 500; t++){
-    const x = (2+Math.random()*(MAP_W-4))*TS + TS/2;
-    const y = (2+Math.random()*(MAP_H-4))*TS + TS/2;
-    if (canStand(x,y,18) && Math.hypot(x-P.x, y-P.y) > minD) return {x,y};
+  if (!flow) computeFlow();
+  const w = MAP_W, h = MAP_H;
+  for (let t = 0; t < 800; t++){
+    const tx = 2 + Math.floor(Math.random()*(w-4));
+    const ty = 2 + Math.floor(Math.random()*(h-4));
+    if (map[ty][tx]) continue;
+    if (flow && flow[ty*w+tx] < 0) continue;      // только достижимые места
+    const x = tx*TS + TS/2, y = ty*TS + TS/2;
+    if (Math.hypot(x-P.x, y-P.y) > minD) return {x, y};
   }
   return {x:P.x+200, y:P.y};
 }
@@ -1127,11 +1132,13 @@ function update(dt){
     }
   }
 
-  // портал
-  if (!portal && kills >= quota){
+  // портал (на босс-уровне — только после смерти босса)
+  if (!portal && kills >= quota && !bossRef){
     const pos = randomFloorFar(300);
     portal = {x:pos.x, y:pos.y, t:0};
     toast = 'ОТКРЫЛСЯ ПОРТАЛ'; toastT = 3.5;
+  } else if (!portal && kills >= quota && bossRef && toastT <= 0){
+    toast = 'ДОБЕЙ БОССА'; toastT = 2.5;
   }
   if (portal){
     portal.t += dt;
@@ -1461,6 +1468,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
+  get mode(){ return mode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
