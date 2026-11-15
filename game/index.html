@@ -141,6 +141,26 @@
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#46525d;pointer-events:none;text-align:center}
   .kbd-focus{outline:2px solid #b6d43a !important;outline-offset:2px;
     box-shadow:0 0 18px rgba(182,212,58,.45) !important}
+
+  /* читаемость на телефоне и ПК */
+  body{font-size:17px}
+  button{font-size:15px;padding:12px 16px}
+  button.small{font-size:12.5px;padding:9px 12px}
+  .panel h2{font-size:clamp(19px,3.2vw,26px)}
+  .panel p{font-size:14.5px}
+  .card h3{font-size:13.5px}
+  .card p{font-size:12.5px}
+  .row{font-size:15px}
+  .row .nm small{font-size:12.5px}
+  .row .lv{font-size:12.5px}
+  .stats{font-size:13.5px}
+  .goldbar{font-size:15px}
+  .tag{font-size:11.5px}
+  .hintbar{font-size:11.5px}
+  .card{width:min(196px,44vw)}
+  .slot h4{font-size:11.5px}
+  .slot p{font-size:10.5px}
+  .slot .rar{font-size:9px}
   input[type=text]{font:inherit;padding:9px 12px;border-radius:9px;border:1px solid #3a4a26;
     background:#10160e;color:var(--txt);width:220px;text-align:center}
 </style>
@@ -152,6 +172,7 @@
   <button id="btnPause" title="Пауза">II</button>
   <button id="btnSound" title="Звуки">♪</button>
   <button id="btnMusicHud" title="Музыка">♫</button>
+  <button id="btnModeHud" title="Режим стрельбы">◎</button>
   <button id="btnFull" title="На весь экран">⛶</button>
 </div>
 
@@ -309,6 +330,14 @@
   </div>
 </div>
 
+<div id="tutinfo" class="screen hidden">
+  <div class="panel" style="max-width:560px">
+    <h2 id="tutTitle">Урок</h2>
+    <p id="tutText"></p>
+    <button class="primary" id="btnTutNext" style="width:100%">Дальше</button>
+  </div>
+</div>
+
 <div id="levelend" class="screen hidden">
   <div class="panel" style="max-width:520px">
     <h2 id="endTitle">Уровень пройден</h2>
@@ -344,7 +373,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.4.1 (16.11)';
+const VERSION = 'v1.5.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1396,6 +1425,10 @@ function syncSettings(){
 }
 $('btnPause').onclick = () => togglePause();
 $('btnSound').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; meta.vol = meta.vol || 60; saveMeta(); syncSettings(); sfx('click'); };
+$('btnModeHud').onclick = () => {
+  setMode(mode === 'auto' ? 'manual' : 'auto');
+  sfx('click');
+};
 $('btnMusicHud').onclick = () => {
   meta.music = meta.music === 0 ? 1 : 0;
   if (meta.music && meta.musicVol === 0) meta.musicVol = 35;
@@ -1475,30 +1508,71 @@ $('btnTouchForce').onclick = () => {
   updateTouchVisibility();
 };
 
+const TUT = [
+  {kind:'portal', title:'Урок 1/6 · Движение', hint:'WASD или левый стик — идти. Зайди в портал.', spawn:0},
+  {kind:'kill',   title:'Урок 2/6 · Стрельба', hint:'Мышь или правый стик — прицел, ЛКМ или RT — огонь. Убей 3 слизней.', spawn:3, need:3},
+  {kind:'level',  title:'Урок 3/6 · Прокачка', hint:'Убивай врагов — копится опыт. Набьёшь уровень — откроется барабан.', spawn:6, need:6},
+  {kind:'info',   title:'Урок 4/6 · Магазин', text:'В главном меню есть МАГАЗИН. Золото падает за убийства и пройденные уровни. Там покупаются постоянные улучшения и разблокировка оружия.'},
+  {kind:'info',   title:'Урок 5/6 · Артефакты и режимы', text:'В барабане выпадают модификаторы и редкие артефакты (около 5%). Режим стрельбы — ручной или авто — переключается кнопкой ◎ в углу экрана или в настройках.'},
+  {kind:'boss',   title:'Урок 6/6 · Босс', hint:'Победи босса, затем зайди в портал.', spawn:2, need:2, boss:true}
+];
+let tutIdx = 0;
+
 function startTutorial(){
+  tutorial = true;
+  tutIdx = 0;
+  startTutLesson(0);
+}
+function startTutLesson(i){
+  tutIdx = i;
+  const cfg = TUT[i];
   resetGame();
   tutorial = true;
-  map = genMap(22, 15, 777);
+  map = genMap(22, 15, 777 + i);
   MAP_W = 22; MAP_H = 15;
   P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
   cam = {x:0, y:0};
-  quota = 3; kills = 0; levelTime = 0;
-  bullets = []; ebullets = []; enemies = []; parts = []; portal = null; bossRef = null;
+  quota = cfg.need || 0; kills = 0; levelTime = 0;
+  bullets = []; ebullets = []; enemies = []; parts = []; clouds = []; portal = null; bossRef = null;
   spawnTimer = 999; flow = null; flowT = 0;
-  for (let i = 0; i < 3; i++) spawnEnemy('slime');
+  for (let k = 0; k < (cfg.spawn || 0); k++) spawnEnemy('slime');
+  if (cfg.boss){
+    spawnBoss('charge', 'Ученик-босс');
+    if (bossRef){ bossRef.hp = 160; bossRef.maxHp = 160; bossRef.speed = 40; }
+  }
+  if (cfg.kind === 'portal'){
+    const pos = randomFloorFar(220);
+    portal = {x:pos.x, y:pos.y, t:0};
+  }
   cam.x = clamp(P.x - W/2, 0, Math.max(0, MAP_W*TS - W));
   cam.y = clamp(P.y - H/2, 0, Math.max(0, MAP_H*TS - H));
-  ['menu','shop','settings','devs','help','levelend','final','pick','records','pause'].forEach(hide);
+  ['menu','shop','settings','devs','help','levelend','final','pick','records','pause','tutinfo','drum'].forEach(hide);
+  if (cfg.kind === 'info'){
+    state = 'info';
+    $('tutTitle').textContent = cfg.title;
+    $('tutText').textContent = cfg.text;
+    showHud(false);
+    show('tutinfo');
+    updateTouchVisibility();
+    resetKbd();
+    return;
+  }
   state = 'play';
   showHud(true);
   startMusic();
   updateTouchVisibility();
 }
+function nextTutLesson(){
+  if (tutIdx + 1 >= TUT.length){ endTutorial(); return; }
+  startTutLesson(tutIdx + 1);
+}
+$('btnTutNext').onclick = () => { sfx('click'); nextTutLesson(); };
 function endTutorial(){
   tutorial = false;
   stopMusic();
   state = 'menu';
   show('menu'); showHud(false); refreshMenu(); updateTouchVisibility();
+  resetKbd();
 }
 $('btnTutorial').onclick = () => { sfx('click'); startTutorial(); };
 
@@ -1737,7 +1811,7 @@ function update(dt){
   if (portal){
     portal.t += dt;
     if (Math.hypot(P.x-portal.x, P.y-portal.y) < 42){
-      if (tutorial){ endTutorial(); return; }
+      if (tutorial){ nextTutLesson(); return; }
       enterPortal();
     }
   }
@@ -1806,7 +1880,7 @@ function addGold(n){
   if (whole > 0){ meta.gold += whole; meta.goldAcc -= whole; }
 }
 function gainXp(n){
-  if (tutorial) return;
+  if (tutorial && (!TUT[tutIdx] || TUT[tutIdx].kind !== 'level')) return;
   xp += n;
   if (xp >= xpNeed){
     xp -= xpNeed; plvl++; xpNeed = Math.round(xpNeed*1.42);
@@ -2092,8 +2166,8 @@ function render(){
 }
 
 function drawHud(){
-  const fs1 = W < 700 ? 10 : 13, fs2 = W < 700 ? 9 : 11;
-  const bw = Math.min(280, W*.32), bh = W < 700 ? 14 : 18, bx = 18, by = 16;
+  const fs1 = W < 700 ? 12 : 15, fs2 = W < 700 ? 11 : 13;
+  const bw = Math.min(280, W*.32), bh = W < 700 ? 16 : 20, bx = 18, by = 16;
   ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(bx-2,by-2,bw+4,bh+4);
   ctx.fillStyle='#3a1b1b'; ctx.fillRect(bx,by,bw,bh);
   const g = ctx.createLinearGradient(bx,0,bx+bw,0);
@@ -2134,20 +2208,17 @@ function drawHud(){
     ctx.fillText(bossRef.name, W/2, y2-6);
   }
 
-  if (tutorial){
-    const step = kills < 1 ? 'ШАГ 1/3 · двигайся: WASD или левый стик'
-      : kills < 3 ? 'ШАГ 2/3 · стреляй: мышь + ЛКМ, правый стик или RT'
-      : 'ШАГ 3/3 · портал открылся — зайди в него';
+  if (tutorial && TUT[tutIdx]){
+    const cfg = TUT[tutIdx];
+    const prog = cfg.need ? `${Math.min(kills, cfg.need)}/${cfg.need}` : '';
     const paras = [
-      step,
-      'МАГАЗИН (в меню): золото за убийства и уровни → улучшения и разблокировка оружия',
-      'ПРОКАЧКА: новый уровень героя — барабан, выбираешь модификатор или артефакт',
-      'НАСТРОЙКИ (Esc): режим стрельбы, вид экрана, звук, джойстик, громкость',
-      'УПРАВЛЕНИЕ: WASD или стик — идти · мышь или правый стик — прицел · ЛКМ или RT — огонь',
-      'РЕЖИМ СТРЕЛЬБЫ: ' + (mode === 'auto' ? 'авто — герой сам бьёт ближайшего' : 'ручной — целишься и жмёшь огонь сам')
+      cfg.title,
+      cfg.hint + (prog ? '  (' + prog + ')' : ''),
+      'УПРАВЛЕНИЕ: WASD или стик — идти · мышь или правый стик — прицел · ЛКМ или RT — огонь · Esc — пауза',
+      'Кнопки сверху справа: пауза, звуки, музыка, режим стрельбы ◎, полный экран'
     ];
     const boxW = Math.min(W - 16, 820);
-    const fsz = W < 700 ? 11 : 13;
+    const fsz = W < 700 ? 13 : 15;
     const lh = Math.round(fsz * 1.45);
     const maxW = boxW - 24;
 
@@ -2215,6 +2286,8 @@ function boot(){
   if (location.hash === '#play'){ meta.weapon='pistol'; startGame(); }
   if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
   if (location.hash === '#tut'){ startTutorial(); }
+  const tm = /^#tut([1-6])$/.exec(location.hash);
+  if (tm){ tutorial = true; startTutLesson(+tm[1] - 1); }
   requestAnimationFrame(loop);
 }
 
