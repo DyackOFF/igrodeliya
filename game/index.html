@@ -459,24 +459,40 @@ function sfx(type){
     case 'hurt':   tone(180, .18, 'sawtooth', 70, 0, .4); break;
     case 'kill':   tone(420, .1, 'triangle', 180, 0, .3); break;
     case 'portal': tone(300, .5, 'sine', 900, 0, .3); tone(600, .5, 'sine', 1400, .1, .25); break;
-    case 'drum':   for (let i = 0; i < 8; i++) tone(500 + i*60, .04, 'square', null, i*.07); tone(880, .25, 'sine', 1320, .6); break;
+    case 'drum':   for (let i = 0; i < 9; i++) tone(480 + i*50, .04, 'square', null, i*.045, .12); break;
+    case 'roll_common': tone(520, .12, 'sine', 700, 0, .3); break;
+    case 'roll_rare':   tone(600, .12, 'triangle', 900, 0, .32); tone(900, .18, 'triangle', 1200, .1, .28); break;
+    case 'roll_epic':   tone(520, .12, 'triangle', 780, 0, .3); tone(780, .12, 'triangle', 1040, .1, .3);
+                        tone(1040, .28, 'sine', 1560, .2, .34); break;
+    case 'roll_artifact': tone(440, .16, 'sine', 880, 0, .3); tone(660, .16, 'sine', 1320, .12, .32);
+                        tone(880, .2, 'sine', 1760, .24, .34); tone(1320, .45, 'sine', 1980, .36, .3);
+                        burst(.4, 5000, 1); break;
     case 'levelup':tone(523, .12, 'sine'); tone(659, .12, 'sine', null, .12); tone(784, .2, 'sine', null, .24); break;
     case 'click':  tone(900, .03, 'square'); break;
     case 'tp':     tone(500, .22, 'sine', 1200); break;
+    case 'poison': burst(.5, 700, 1); tone(240, .5, 'sine', 120, 0, .22); break;
     case 'lose':   tone(220, .5, 'sawtooth', 60); break;
   }
 }
 
 // ================= МУЗЫКА =================
 const MUSIC = {timer: null, step: 0};
+const MUSIC_BARS = [
+  {shift: 0,  pat: [0, 7, 3, 7, 10, 7, 3, 5]},
+  {shift: -2, pat: [0, 5, 3, 5, 8, 5, 3, 2]},
+  {shift: -4, pat: [0, 7, 5, 3, 5, 7, 10, 7]},
+  {shift: 0,  pat: [0, 3, 5, 7, 10, 12, 10, 7]},
+  {shift: 3,  pat: [0, 5, 8, 5, 3, 5, 8, 10]},
+  {shift: -2, pat: [0, 3, 7, 3, 5, 3, 0, 2]}
+];
 function musicNote(a, freq, dur, vol, wave, attack){
   const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
   o.type = wave || 'triangle';
   o.frequency.value = freq;
-  f.type = 'lowpass'; f.frequency.value = 1400;
+  f.type = 'lowpass'; f.frequency.value = 1800;
   const t = a.currentTime;
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(vol, t + (attack || 0.06));
+  g.gain.linearRampToValueAtTime(vol, t + (attack || 0.05));
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(f); f.connect(g); g.connect(a.destination);
   o.start(t); o.stop(t + dur + 0.05);
@@ -489,12 +505,35 @@ function musicTick(){
   const biome = (typeof lvl === 'number' && LEVELS[lvl]) ? LEVELS[lvl].biome : 0;
   const roots = [110, 98, 87, 104, 92, 123];
   const root = roots[biome] || 110;
-  const scale = [0, 3, 5, 7, 10, 12, 15];
   const s = MUSIC.step++;
-  const n = scale[(s * 3) % scale.length];
-  musicNote(a, root * Math.pow(2, n/12) * 2, 0.85, vol * 0.16, 'triangle');
-  if (s % 4 === 0) musicNote(a, root, 1.7, vol * 0.22, 'sine', 0.12);
-  if (s % 8 === 4) musicNote(a, root * 1.5, 1.3, vol * 0.10, 'sine', 0.2);
+
+  const bar = MUSIC_BARS[Math.floor(s / 8) % MUSIC_BARS.length];
+  const beat = s % 8;
+  const note = bar.pat[beat];
+  const f = root * Math.pow(2, note / 12) * 2;
+  musicNote(a, f, 0.24, vol * 0.15, 'triangle', 0.02);
+
+  // бас на сильную долю
+  if (beat % 4 === 0){
+    musicNote(a, root * Math.pow(2, bar.shift / 12) * 0.5, 0.55, vol * 0.22, 'sine', 0.04);
+  }
+  // подкладка каждые два такта
+  if (beat === 0 && Math.floor(s / 8) % 2 === 0){
+    musicNote(a, root * Math.pow(2, (bar.shift + 7) / 12) * 0.5, 1.2, vol * 0.08, 'sine', 0.25);
+  }
+  // ритм-щелчок
+  if (beat % 2 === 1){
+    const n = noise();
+    if (n){
+      const g = a.createGain(), flt = a.createBiquadFilter();
+      flt.type = 'highpass'; flt.frequency.value = 6000;
+      const t = a.currentTime;
+      g.gain.setValueAtTime(vol * 0.035, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      n.connect(flt); flt.connect(g); g.connect(a.destination);
+      n.start(t); n.stop(t + 0.07);
+    }
+  }
 }
 function startMusic(){
   if (meta.music === 0) return;
@@ -502,7 +541,7 @@ function startMusic(){
   audio();
   MUSIC.step = 0;
   musicTick();
-  MUSIC.timer = setInterval(musicTick, 460);
+  MUSIC.timer = setInterval(musicTick, 250);
 }
 function stopMusic(){
   if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
@@ -736,7 +775,7 @@ const ENEMY = {
 
 // ================= СОСТОЯНИЕ =================
 let state = 'menu';
-let P, bullets, ebullets, enemies, parts, map, MAP_W, MAP_H, cam,
+let P, bullets, ebullets, enemies, parts, clouds, map, MAP_W, MAP_H, cam,
     lvl, kills, levelTime, xp, xpNeed, plvl, stacks, bossRef, portal, toast, toastT,
     quota, spawnTimer, flow, flowT, rerolls, drumItem, drumOpen;
 let mode = 'manual';
@@ -755,7 +794,7 @@ function resetGame(){
   P.speed *= 1 + 0.05*upLvl('speed');
   P.xpMul += 0.10*upLvl('xp');
   P.goldMul = 1 + 0.15*upLvl('gold');
-  bullets=[]; ebullets=[]; enemies=[]; parts=[];
+  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[];
   lvl=0; kills=0; levelTime=0; xp=0; xpNeed=20; plvl=1; stacks={}; bossRef=null; portal=null;
   toast=''; toastT=0; quota=0; spawnTimer=1; flow=null; flowT=0;
 }
@@ -767,7 +806,7 @@ function startLevel(i){
   MAP_W = L.w; MAP_H = L.h;
   P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
   cam = {x:0,y:0};
-  bullets=[]; ebullets=[]; enemies=[]; parts=[]; bossRef=null; portal=null;
+  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; bossRef=null; portal=null;
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
   // здоровье между уровнями НЕ восстанавливается само — только за улучшение «Лечение»
@@ -1000,6 +1039,7 @@ function spinReel(){
     $('resName').style.color = col;
     $('resName').style.textShadow = rank >= 2 ? `0 0 22px ${col}` : 'none';
     $('resDesc').textContent = d.desc || '';
+    sfx(rank === 3 ? 'roll_artifact' : rank === 2 ? 'roll_epic' : rank === 1 ? 'roll_rare' : 'roll_common');
     $('btnTake').disabled = false;
     $('btnReroll').disabled = meta.gold < rerollCost();
     $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
@@ -1520,6 +1560,10 @@ function update(dt){
       if (P.vamp) P.hp = Math.min(P.maxHp, P.hp + P.vamp);
       gainXp(Math.round(en.xp * P.xpMul));
       parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
+      if (en.poisonT > 0){
+        clouds.push({x:en.x, y:en.y, r:78, life:2, max:2, tick:0, dmg:6 + 5*(P.poison||1)});
+        sfx('poison');
+      }
       if (en.boss){ bossRef = null; addGold(40 + lvl*8); }
       if (state !== 'play') return;
       continue;
@@ -1535,6 +1579,24 @@ function update(dt){
       spawnEnemy(L.types[Math.floor(Math.random()*L.types.length)]);
       spawnTimer = Math.max(.18, L.rate*(.7+Math.random()*.6));
     }
+  }
+
+  // ядовитые облака
+  for (let i = clouds.length-1; i >= 0; i--){
+    const c = clouds[i];
+    c.life -= dt;
+    c.tick -= dt;
+    if (c.tick <= 0){
+      c.tick = .3;
+      for (const en of enemies){
+        if (Math.hypot(en.x-c.x, en.y-c.y) < c.r + en.r*.5){
+          en.hp -= c.dmg; en.flash = .1;
+          en.poisonT = Math.max(en.poisonT, 1.5);
+          en.poisonDmg = Math.max(en.poisonDmg, 4);
+        }
+      }
+    }
+    if (c.life <= 0) clouds.splice(i,1);
   }
 
   // портал (на босс-уровне — только после смерти босса)
@@ -1699,6 +1761,20 @@ function render(){
   ctx.globalCompositeOperation = 'overlay';
   ctx.fillStyle = B.overlay; ctx.fillRect(0,0,W,H);
   ctx.globalCompositeOperation = 'source-over';
+
+  // ядовитые облака
+  for (const c of clouds){
+    const cx = c.x - cam.x, cy = c.y - cam.y;
+    const k = Math.max(0, c.life / c.max);
+    const pulse = 1 + Math.sin((c.max - c.life) * 9) * .07;
+    ctx.globalAlpha = .3 * k;
+    ctx.fillStyle = '#7ec24a';
+    ctx.beginPath(); ctx.arc(cx, cy, c.r * pulse, 0, 6.3); ctx.fill();
+    ctx.globalAlpha = .55 * k;
+    ctx.strokeStyle = '#a8e06a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, c.r * pulse, 0, 6.3); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 
   // портал
   if (portal){
@@ -2002,6 +2078,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
+  get clouds(){ return clouds; },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
