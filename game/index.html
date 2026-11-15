@@ -570,7 +570,7 @@ function spawnBoss(kind, name){
   const hp = 500 * (1 + lvl*0.18);
   bossRef = {
     x:pos.x, y:pos.y, type:'boss', bossKind:kind, name:name||'Босс', t:0,
-    r:44, scale:112, hp, maxHp:hp, speed:52*(1+lvl*0.02), dmg:48, xp:150,
+    r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48, xp:150,
     flash:0, phase:0, cd:1.5, dashT:0, dashVX:0, dashVY:0, slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0
   };
   enemies.push(bossRef);
