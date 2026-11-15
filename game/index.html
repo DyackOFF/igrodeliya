@@ -393,9 +393,11 @@ const WEAPONS = {
   rocket:  {name:'Ракетница',     dmg:30, delay:.95, speed:440, count:1, spread:0, rocket:true, price:1800},
   grenade: {name:'Гранатомёт',    dmg:38, delay:1.15,speed:380, count:1, spread:.05, rocket:true, aoe:96, price:2200},
   plasma:  {name:'Плазмаган',     dmg:24, delay:.52, speed:620, count:1, spread:.03, pierce:2, price:3000},
-  laser:   {name:'Лазер',         dmg:16, delay:.34, speed:1500,count:1, spread:0, pierce:99, thin:true, price:4000}
+  cryo:    {name:'Криопушка',     dmg:14, delay:.42, speed:700, count:1, spread:.06, freeze:true, price:3500},
+  railgun: {name:'Рельса',        dmg:70, delay:1.30, speed:1600,count:1, spread:0, pierce:8, thin:true, price:4500},
+  laser:   {name:'Лазер',         dmg:16, delay:.34, speed:1500,count:1, spread:0, pierce:99, thin:true, price:9999}
 };
-const WEAPON_ORDER = ['pistol','dual','smg','shotgun','minigun','sniper','rocket','grenade','plasma','laser'];
+const WEAPON_ORDER = ['pistol','dual','smg','shotgun','minigun','sniper','rocket','grenade','plasma','cryo','railgun','laser'];
 
 // ================= ПРЕДМЕТЫ =================
 const ITEMS = [
@@ -736,6 +738,7 @@ function shoot(){
       dmg: dmg*(isCrit?2.5:1), crit: isCrit,
       pierce: (w.pierce ?? P.pierce), hit: new Set(),
       rocket: !!w.rocket, aoe: w.aoe || (P.boom?70:0) || (w.rocket?70:0),
+      freeze: !!w.freeze,
       thin: !!w.thin, life: 2.4, r: w.thin?5:8, grace: .02
     });
   }
@@ -1012,6 +1015,7 @@ function update(dt){
       if (Math.hypot(en.x-b.x, en.y-b.y) < en.r + b.r){
         en.hp -= b.dmg; en.flash = .12;
         if (P.slow) en.slowT = .8 + .4*P.slow;
+        if (b.freeze) en.slowT = Math.max(en.slowT, 1.3);
         if (P.poison){ en.poisonT = 2.5; en.poisonDmg = Math.max(en.poisonDmg, b.dmg*.18*P.poison); }
         if (P.knock){ const a3 = Math.atan2(en.y-b.y, en.x-b.x);
           moveWithCollision(en, Math.cos(a3)*P.knock*dt*4, Math.sin(a3)*P.knock*dt*4); }
