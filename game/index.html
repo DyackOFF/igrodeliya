@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.8.0 (16.11)';
+const VERSION = 'v1.8.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1755,7 +1755,7 @@ function update(dt){
     else en.idle = 0;
     en.lastX = en.x; en.lastY = en.y;
 
-    if (!en.boss && en.idle > 4 && d > 220){
+    if (!en.boss && en.idle > 6 && d > 320 && (en.type !== 'spitter' || d > 420)){
       parts.push({x:en.x, y:en.y, life:.45, max:.45, kind:'tp', size:en.scale});
       const pos = randomFloorFar(260);
       en.x = pos.x; en.y = pos.y;
@@ -1841,8 +1841,15 @@ function update(dt){
 function bossUpdate(en, dt, d, ux, uy, slowMul){
   en.cd -= dt;
   const sp = en.speed*slowMul;
+  // к герою идём по волновой карте, чтобы не застревать в стенах
+  const tgt = flowTarget(en);
+  let fx = ux, fy = uy;
+  if (tgt){
+    const tdx = tgt.x - en.x, tdy = tgt.y - en.y, td = Math.hypot(tdx, tdy) || 1;
+    fx = tdx/td; fy = tdy/td;
+  }
   if (en.bossKind === 'summon'){
-    moveWithCollision(en, ux*sp*dt*.5, uy*sp*dt*.5);
+    moveWithCollision(en, fx*sp*dt*.9, fy*sp*dt*.9);
     if (en.cd <= 0){
       en.cd = 3.2;
       for (let k = 0; k < 2; k++){
@@ -1868,11 +1875,11 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
     } else if (en.cd <= 0){
       en.cd = 2.2; en.windT = .9;
     } else {
-      moveWithCollision(en, ux*sp*dt, uy*sp*dt);
+      moveWithCollision(en, fx*sp*dt, fy*sp*dt);
     }
   } else {
-    if (d > 300) moveWithCollision(en, ux*sp*dt, uy*sp*dt);
-    else if (d < 220) moveWithCollision(en, -ux*sp*dt*.5, -uy*sp*dt*.5);
+    if (d > 300) moveWithCollision(en, fx*sp*dt, fy*sp*dt);
+    else if (d < 220) moveWithCollision(en, -fx*sp*dt*.5, -fy*sp*dt*.5);
     if (en.cd <= 0){
       en.cd = 1.9;
       const base = Math.atan2(P.y-en.y, P.x-en.x);
