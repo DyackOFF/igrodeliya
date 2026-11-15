@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.9.3 (16.11)';
+const VERSION = 'v1.9.4 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1765,7 +1765,11 @@ function update(dt){
     else en.idle = 0;
     en.lastX = en.x; en.lastY = en.y;
 
-    if (!en.boss && en.idle > 6 && d > 320 && (en.type !== 'spitter' || d > 420)){
+    const stuck = en.boss
+      ? (en.idle > 4 && d > 200 && !en.windT && !en.dashT)
+      : (en.idle > 6 && d > 320 && (en.type !== 'spitter' || d > 420));
+
+    if (stuck){
       parts.push({x:en.x, y:en.y, life:.45, max:.45, kind:'tp', size:en.scale});
       const pos = randomFloorFar(260);
       en.x = pos.x; en.y = pos.y;
