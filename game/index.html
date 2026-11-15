@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.6.0 (16.11)';
+const VERSION = 'v1.7.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -975,11 +975,13 @@ function spawnEnemy(type, near){
 }
 function spawnBoss(kind, name){
   const pos = randomFloorFar(320);
-  const hp = 500 * (1 + lvl*0.18);
+  let hp = 500 * (1 + lvl*0.18);
+  if (kind === 'charge') hp *= 3;      // Камнеед толще остальных
   bossRef = {
     x:pos.x, y:pos.y, type:'boss', bossKind:kind, name:name||'Босс', t:0,
     r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48, xp:150,
-    flash:0, phase:0, cd:1.5, dashT:0, dashVX:0, dashVY:0, slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0
+    flash:0, phase:0, cd:1.5, dashT:0, windT:0, dashVX:0, dashVY:0,
+    slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0
   };
   enemies.push(bossRef);
 }
@@ -1842,9 +1844,25 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
       }
     }
   } else if (en.bossKind === 'charge'){
-    if (en.dashT > 0){ en.dashT -= dt; moveWithCollision(en, en.dashVX*dt, en.dashVY*dt); }
-    else if (en.cd <= 0){ en.cd = 2.4; en.dashT = .55; en.dashVX = ux*420; en.dashVY = uy*420; }
-    else moveWithCollision(en, ux*sp*dt, uy*sp*dt);
+    if (en.dashT > 0){
+      // разгон и рикошет от стен
+      en.dashT -= dt;
+      en.dashVX *= (1 + 2.4*dt);
+      en.dashVY *= (1 + 2.4*dt);
+      const nx = en.x + en.dashVX*dt, ny = en.y + en.dashVY*dt;
+      if (canStand(nx, en.y, en.r)) en.x = nx; else { en.dashVX *= -0.96; }
+      if (canStand(en.x, ny, en.r)) en.y = ny; else { en.dashVY *= -0.96; }
+      if (Math.random() < .5) parts.push({x:en.x, y:en.y, life:.25, max:.25, kind:'dust'});
+    } else if (en.windT > 0){
+      // копит разгон на месте
+      en.windT -= dt;
+      if (Math.random() < .45) parts.push({x:en.x + (Math.random()-.5)*70, y:en.y + (Math.random()-.5)*70, life:.3, max:.3, kind:'dust'});
+      if (en.windT <= 0){ en.dashT = 1.5; en.dashVX = ux*300; en.dashVY = uy*300; }
+    } else if (en.cd <= 0){
+      en.cd = 2.2; en.windT = .9;
+    } else {
+      moveWithCollision(en, ux*sp*dt, uy*sp*dt);
+    }
   } else {
     if (d > 300) moveWithCollision(en, ux*sp*dt, uy*sp*dt);
     else if (d < 220) moveWithCollision(en, -ux*sp*dt*.5, -uy*sp*dt*.5);
@@ -2021,11 +2039,24 @@ function render(){
 
   for (const en of enemies){
     const ex = en.x-cam.x, ey = en.y-cam.y;
-    if (en.boss){
+    if (en.type === 'boss'){
       const im = IMG[Math.floor(en.t*3)%2 ? 'slime1':'slime0'];
       if (im) ctx.drawImage(im, ex-en.scale/2, ey-en.scale/2, en.scale, en.scale);
       ctx.globalAlpha = .3; ctx.fillStyle = '#c0392b';
       ctx.beginPath(); ctx.arc(ex,ey,en.r*.9,0,6.3); ctx.fill(); ctx.globalAlpha = 1;
+      if (en.bossKind === 'charge' && en.windT > 0){
+        const k = 1 - en.windT / .9;
+        ctx.globalAlpha = .55 * (1 - k) + .25;
+        ctx.strokeStyle = '#ff5c3a'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(ex, ey, 30 + k*60, 0, 6.3); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      if (en.bossKind === 'charge' && en.dashT > 0){
+        ctx.globalAlpha = .35; ctx.fillStyle = '#ff7a4a';
+        ctx.beginPath(); ctx.arc(ex - en.dashVX*.02, ey - en.dashVY*.02, 26, 0, 6.3); ctx.fill();
+        ctx.beginPath(); ctx.arc(ex - en.dashVX*.04, ey - en.dashVY*.04, 18, 0, 6.3); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
     } else {
       const def = ENEMY[en.type];
       const key = def.spr[Math.floor(en.t*(en.type==='bat'?9:3)) % def.spr.length];
