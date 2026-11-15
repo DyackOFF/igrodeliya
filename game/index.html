@@ -341,7 +341,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.1.0 (16.11)';
+const VERSION = 'v1.2.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -476,7 +476,7 @@ function sfx(type){
 }
 
 // ================= МУЗЫКА =================
-const MUSIC = {timer: null, step: 0};
+const MUSIC = {timer: null, step: 0, mode: 'combat'};
 const MUSIC_BARS = [
   {shift: 0,  pat: [0, 7, 3, 7, 10, 7, 3, 5]},
   {shift: -2, pat: [0, 5, 3, 5, 8, 5, 3, 2]},
@@ -497,42 +497,70 @@ function musicNote(a, freq, dur, vol, wave, attack){
   o.connect(f); f.connect(g); g.connect(a.destination);
   o.start(t); o.stop(t + dur + 0.05);
 }
+function perc(a, kind, vol){
+  const t = a.currentTime;
+  if (kind === 'kick'){
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.16);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t + 0.22);
+  } else {
+    const n = noise(); if (!n) return;
+    const f = a.createBiquadFilter(), g = a.createGain();
+    f.type = 'highpass'; f.frequency.value = kind === 'snare' ? 1800 : 7000;
+    const dur = kind === 'snare' ? 0.12 : 0.035;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    n.connect(f); f.connect(g); g.connect(a.destination);
+    n.start(t); n.stop(t + dur + 0.02);
+  }
+}
+function musicRoot(){
+  const biome = (typeof lvl === 'number' && LEVELS[lvl]) ? LEVELS[lvl].biome : 0;
+  const roots = [110, 98, 87, 104, 92, 123];
+  return roots[biome] || 110;
+}
 function musicTick(){
   const a = audio(); if (!a) return;
   if (meta.music === 0) return;
   const vol = (meta.musicVol === undefined ? 35 : meta.musicVol) / 100;
   if (vol <= 0) return;
-  const biome = (typeof lvl === 'number' && LEVELS[lvl]) ? LEVELS[lvl].biome : 0;
-  const roots = [110, 98, 87, 104, 92, 123];
-  const root = roots[biome] || 110;
+  const root = musicRoot();
   const s = MUSIC.step++;
 
-  const bar = MUSIC_BARS[Math.floor(s / 8) % MUSIC_BARS.length];
-  const beat = s % 8;
-  const note = bar.pat[beat];
-  const f = root * Math.pow(2, note / 12) * 2;
-  musicNote(a, f, 0.24, vol * 0.15, 'triangle', 0.02);
+  if (MUSIC.mode === 'calm'){
+    // спокойный эмбиент: редкие ноты и мягкие аккорды
+    const chord = [0, 7, 12, 10];
+    const n = chord[s % chord.length];
+    musicNote(a, root * Math.pow(2, n/12), 1.6, vol * 0.10, 'sine', 0.25);
+    if (s % 4 === 0) musicNote(a, root * 0.5, 2.4, vol * 0.14, 'sine', 0.4);
+    if (s % 8 === 4) musicNote(a, root * Math.pow(2, 7/12) * 2, 1.4, vol * 0.06, 'triangle', 0.3);
+    return;
+  }
 
-  // бас на сильную долю
-  if (beat % 4 === 0){
-    musicNote(a, root * Math.pow(2, bar.shift / 12) * 0.5, 0.55, vol * 0.22, 'sine', 0.04);
+  // боевой режим: драм-н-бейс с фанковым басом
+  const b = s % 16, bar = Math.floor(s / 16);
+  const barData = MUSIC_BARS[bar % MUSIC_BARS.length];
+  const shift = barData.shift / 12;
+
+  if (b === 0 || b === 6 || b === 10) perc(a, 'kick', vol * 0.5);
+  if (b === 4 || b === 12) perc(a, 'snare', vol * 0.22);
+  if (b % 2 === 0) perc(a, 'hat', vol * 0.08 + (b % 4 === 0 ? vol*0.04 : 0));
+
+  const bassPat = [0, 0, 7, 0, 3, 0, 10, 0, 0, 0, 5, 0, 7, 0, 3, 0];
+  if (bassPat[b]){
+    musicNote(a, root * Math.pow(2, (bassPat[b] + barData.shift)/12) * 0.5, 0.12, vol * 0.3, 'sawtooth', 0.01);
   }
-  // подкладка каждые два такта
-  if (beat === 0 && Math.floor(s / 8) % 2 === 0){
-    musicNote(a, root * Math.pow(2, (bar.shift + 7) / 12) * 0.5, 1.2, vol * 0.08, 'sine', 0.25);
+  if (b === 2 || b === 7 || b === 13){
+    const n = barData.pat[b === 2 ? 0 : b === 7 ? 3 : 5];
+    musicNote(a, root * Math.pow(2, (n + barData.shift)/12) * 2, 0.14, vol * 0.16, 'triangle', 0.01);
   }
-  // ритм-щелчок
-  if (beat % 2 === 1){
-    const n = noise();
-    if (n){
-      const g = a.createGain(), flt = a.createBiquadFilter();
-      flt.type = 'highpass'; flt.frequency.value = 6000;
-      const t = a.currentTime;
-      g.gain.setValueAtTime(vol * 0.035, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-      n.connect(flt); flt.connect(g); g.connect(a.destination);
-      n.start(t); n.stop(t + 0.07);
-    }
+  if (b === 15 && bar % 4 === 3){
+    musicNote(a, root * Math.pow(2, 12/12) * 4, 0.3, vol * 0.12, 'sine', 0.01);
   }
 }
 function startMusic(){
@@ -541,7 +569,16 @@ function startMusic(){
   audio();
   MUSIC.step = 0;
   musicTick();
-  MUSIC.timer = setInterval(musicTick, 250);
+  MUSIC.timer = setInterval(musicTick, MUSIC.mode === 'calm' ? 620 : 125);
+}
+function setMusicMode(m){
+  if (MUSIC.mode === m) return;
+  MUSIC.mode = m;
+  MUSIC.step = 0;
+  if (MUSIC.timer){
+    clearInterval(MUSIC.timer);
+    MUSIC.timer = setInterval(musicTick, m === 'calm' ? 620 : 125);
+  }
 }
 function stopMusic(){
   if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
@@ -809,6 +846,7 @@ function startLevel(i){
   bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; bossRef=null; portal=null;
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
+  setMusicMode('combat');
   // здоровье между уровнями НЕ восстанавливается само — только за улучшение «Лечение»
   P.hp = Math.min(P.maxHp, P.hp + 15*upLvl('heal'));
   P.shield = P.shieldMax;
@@ -1604,6 +1642,7 @@ function update(dt){
     const pos = randomFloorFar(300);
     portal = {x:pos.x, y:pos.y, t:0};
     sfx('portal');
+    setMusicMode('calm');
     toast = 'ОТКРЫЛСЯ ПОРТАЛ'; toastT = 3.5;
   } else if (!portal && kills >= quota && bossRef && toastT <= 0){
     toast = 'ДОБЕЙ БОССА'; toastT = 2.5;
@@ -2078,7 +2117,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get clouds(){ return clouds; },
+  get clouds(){ return clouds; }, get musicMode(){ return MUSIC.mode; },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
@@ -2087,7 +2126,8 @@ window.__game = {
     if (dir) keys.add(dir); },
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
-  setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; }
+  setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
+  debugSetKills(n){ kills = n; }
 };
 })();
 </script>
