@@ -432,6 +432,7 @@ function sfx(type){
     case 'drum':   for (let i = 0; i < 8; i++) tone(500 + i*60, .04, 'square', null, i*.07); tone(880, .25, 'sine', 1320, .6); break;
     case 'levelup':tone(523, .12, 'sine'); tone(659, .12, 'sine', null, .12); tone(784, .2, 'sine', null, .24); break;
     case 'click':  tone(900, .03, 'square'); break;
+    case 'tp':     tone(500, .22, 'sine', 1200); break;
     case 'lose':   tone(220, .5, 'sawtooth', 60); break;
   }
 }
@@ -803,7 +804,8 @@ function spawnEnemy(type, near){
     x:pos.x, y:pos.y, type, t:0, r:b.r, scale:b.scale,
     hp:b.hp*mul, maxHp:b.hp*mul, speed:b.speed*L.speed,
     dmg:b.dmg, xp:b.xp, flash:0, phase:Math.random()*6.28, cd:1+Math.random()*2,
-    slowT:0, poisonT:0, poisonDmg:0, boss:false, orbHit:0
+    slowT:0, poisonT:0, poisonDmg:0, boss:false, orbHit:0,
+    idle:0, lastX:pos.x, lastY:pos.y
   });
 }
 function spawnBoss(kind, name){
@@ -1439,6 +1441,22 @@ function update(dt){
       hurtPlayer(en.dmg);
     }
 
+    // если монстр застрял на месте — телепортируем его в случайное место
+    const moved = Math.hypot(en.x - (en.lastX === undefined ? en.x : en.lastX),
+                             en.y - (en.lastY === undefined ? en.y : en.lastY));
+    if (moved < 0.5) en.idle = (en.idle || 0) + dt;
+    else en.idle = 0;
+    en.lastX = en.x; en.lastY = en.y;
+
+    if (!en.boss && en.idle > 4 && d > 220){
+      parts.push({x:en.x, y:en.y, life:.45, max:.45, kind:'tp', size:en.scale});
+      const pos = randomFloorFar(260);
+      en.x = pos.x; en.y = pos.y;
+      en.idle = 0; en.lastX = en.x; en.lastY = en.y;
+      parts.push({x:en.x, y:en.y, life:.45, max:.45, kind:'tp', size:en.scale});
+      sfx('tp');
+    }
+
     if (en.hp <= 0){
       enemies.splice(i,1);
       kills++;
@@ -1712,6 +1730,16 @@ function render(){
       ctx.beginPath(); ctx.arc(px,py,(1-k)*p.size*.7+8,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
     else if (p.kind==='hurt'){ ctx.globalAlpha=k*.4; ctx.fillStyle='#c0392b';
       ctx.beginPath(); ctx.arc(px,py,55,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
+    else if (p.kind==='tp'){
+      const prog = 1 - k;
+      ctx.globalAlpha = k;
+      ctx.strokeStyle = '#b6d43a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(px, py, 8 + prog*46, 0, 6.3); ctx.stroke();
+      ctx.globalAlpha = k*.35;
+      ctx.fillStyle = '#b6d43a';
+      ctx.beginPath(); ctx.arc(px, py, 6 + prog*20, 0, 6.3); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
   }
 
   const fog = .45 + (L.fog||0);
