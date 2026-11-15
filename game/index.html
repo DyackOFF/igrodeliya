@@ -41,6 +41,7 @@
     color:#fff;text-shadow:0 0 26px rgba(182,212,58,.45)}
   h1 em{font-style:normal;color:var(--lime)}
   .tag{color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:10px;margin-bottom:10px}
+  .credits{color:var(--amber);font-size:13.5px;letter-spacing:.04em;margin:0 0 12px;opacity:.92}
 
   .btns{display:flex;flex-direction:column;gap:7px;width:min(300px,84vw)}
   button{font:inherit;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;
@@ -199,6 +200,7 @@
   </div>
   <h1>Crazy <em>Mountaine</em></h1>
   <div class="tag"><span id="verTag">v0.0</span> · 30 уровней · 6 боссов · гимназия им. Н.В. Пушкова</div>
+  <div class="credits">Главный разработчик — Дьяков-Веденеев Я.О.</div>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
   <div class="btns">
     <button class="primary" id="btnPlay">Играть</button>
@@ -293,6 +295,7 @@
   <div class="panel" style="max-width:560px">
     <h2>Разработчики</h2>
     <p>ИГРОДЕЛИЯ · 2026</p>
+    <div class="row" style="border-color:#3a4a26"><b>Дьяков-Веденеев Я.О.</b><span>главный разработчик</span></div>
     <div class="row"><b>Григорий Белугин</b><span>идея, боевая система</span></div>
     <div class="row"><b>Платон Капитонов</b><span>механики, прокачка</span></div>
     <div class="row"><b>Никита Белугин</b><span>сюжет, уровни</span></div>
@@ -373,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.5.0 (16.11)';
+const VERSION = 'v1.6.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -508,14 +511,15 @@ function sfx(type){
 }
 
 // ================= МУЗЫКА =================
-const MUSIC = {timer: null, step: 0, mode: 'combat'};
-const MUSIC_BARS = [
-  {shift: 0,  pat: [0, 7, 3, 7, 10, 7, 3, 5]},
-  {shift: -2, pat: [0, 5, 3, 5, 8, 5, 3, 2]},
-  {shift: -4, pat: [0, 7, 5, 3, 5, 7, 10, 7]},
-  {shift: 0,  pat: [0, 3, 5, 7, 10, 12, 10, 7]},
-  {shift: 3,  pat: [0, 5, 8, 5, 3, 5, 8, 10]},
-  {shift: -2, pat: [0, 3, 7, 3, 5, 3, 0, 2]}
+const MUSIC = {timer: null, step: 0, mode: 'combat', track: 0};
+const TRACKS = [
+  // 6 разных треков — по одному на каждые 5 уровней (после каждого босса новый)
+  {step:125, root:110, bass:[0,0,7,0,3,0,10,0,0,0,5,0,7,0,3,0],   lead:[0,7,3,10],  kick:[0,6,10],      snare:[4,12],      hat:2},
+  {step:118, root:98,  bass:[0,5,0,3,0,8,0,7,0,5,0,2,0,7,0,3],   lead:[5,3,8,12],  kick:[0,3,8,11],    snare:[4,12],      hat:2},
+  {step:136, root:87,  bass:[0,0,0,7,0,0,10,0,0,5,0,0,3,0,7,0],  lead:[0,3,7,5],   kick:[0,7,10],      snare:[6,14],      hat:4},
+  {step:110, root:104, bass:[0,2,0,7,0,5,0,3,0,10,0,7,0,3,0,12], lead:[10,7,12,15],kick:[0,2,8,10],    snare:[4,12,14],   hat:2},
+  {step:122, root:92,  bass:[0,0,3,0,7,0,10,0,0,12,0,10,7,0,3,0],lead:[3,10,5,12], kick:[0,6,10,13],   snare:[4,12],      hat:2},
+  {step:105, root:123, bass:[0,7,0,3,0,10,0,5,0,3,0,7,0,12,0,10],lead:[12,10,7,15],kick:[0,4,8,12],    snare:[2,6,10,14], hat:2}
 ];
 function musicNote(a, freq, dur, vol, wave, attack){
   const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
@@ -552,9 +556,8 @@ function perc(a, kind, vol){
   }
 }
 function musicRoot(){
-  const biome = (typeof lvl === 'number' && LEVELS[lvl]) ? LEVELS[lvl].biome : 0;
-  const roots = [110, 98, 87, 104, 92, 123];
-  return roots[biome] || 110;
+  const T = TRACKS[MUSIC.track] || TRACKS[0];
+  return T.root;
 }
 function musicTick(){
   const a = audio(); if (!a) return;
@@ -574,25 +577,21 @@ function musicTick(){
     return;
   }
 
-  // боевой режим: драм-н-бейс с фанковым басом
+  // боевой режим: у каждого трека свой рисунок
+  const T = TRACKS[MUSIC.track] || TRACKS[0];
   const b = s % 16, bar = Math.floor(s / 16);
-  const barData = MUSIC_BARS[bar % MUSIC_BARS.length];
-  const shift = barData.shift / 12;
+  const shift = ((Math.floor(bar / 2) % 2) ? -2 : 0) / 12;
 
-  if (b === 0 || b === 6 || b === 10) perc(a, 'kick', vol * 0.5);
-  if (b === 4 || b === 12) perc(a, 'snare', vol * 0.22);
-  if (b % 2 === 0) perc(a, 'hat', vol * 0.08 + (b % 4 === 0 ? vol*0.04 : 0));
+  if (T.kick.indexOf(b) >= 0) perc(a, 'kick', vol * 0.5);
+  if (T.snare.indexOf(b) >= 0) perc(a, 'snare', vol * 0.22);
+  if (b % T.hat === 0) perc(a, 'hat', vol * 0.08 + (b % 4 === 0 ? vol * 0.04 : 0));
 
-  const bassPat = [0, 0, 7, 0, 3, 0, 10, 0, 0, 0, 5, 0, 7, 0, 3, 0];
-  if (bassPat[b]){
-    musicNote(a, root * Math.pow(2, (bassPat[b] + barData.shift)/12) * 0.5, 0.12, vol * 0.3, 'sawtooth', 0.01);
+  if (T.bass[b]){
+    musicNote(a, root * Math.pow(2, (T.bass[b] + shift*12) / 12) * 0.5, 0.12, vol * 0.3, 'sawtooth', 0.01);
   }
-  if (b === 2 || b === 7 || b === 13){
-    const n = barData.pat[b === 2 ? 0 : b === 7 ? 3 : 5];
-    musicNote(a, root * Math.pow(2, (n + barData.shift)/12) * 2, 0.14, vol * 0.16, 'triangle', 0.01);
-  }
-  if (b === 15 && bar % 4 === 3){
-    musicNote(a, root * Math.pow(2, 12/12) * 4, 0.3, vol * 0.12, 'sine', 0.01);
+  if (b % 4 === 0){
+    const n = T.lead[Math.floor(b / 4) % T.lead.length];
+    musicNote(a, root * Math.pow(2, (n + shift*12) / 12) * 2, 0.14, vol * 0.16, 'triangle', 0.01);
   }
 }
 function startMusic(){
@@ -609,7 +608,17 @@ function setMusicMode(m){
   MUSIC.step = 0;
   if (MUSIC.timer){
     clearInterval(MUSIC.timer);
-    MUSIC.timer = setInterval(musicTick, m === 'calm' ? 620 : 125);
+    MUSIC.timer = setInterval(musicTick, m === 'calm' ? 620 : (TRACKS[MUSIC.track] || TRACKS[0]).step);
+  }
+}
+function setMusicTrack(i){
+  i = Math.max(0, Math.min(TRACKS.length - 1, i));
+  if (MUSIC.track === i) return;
+  MUSIC.track = i;
+  MUSIC.step = 0;
+  if (MUSIC.timer){
+    clearInterval(MUSIC.timer);
+    MUSIC.timer = setInterval(musicTick, MUSIC.mode === 'calm' ? 620 : (TRACKS[i] || TRACKS[0]).step);
   }
 }
 function stopMusic(){
@@ -878,6 +887,7 @@ function startLevel(i){
   bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; bossRef=null; portal=null;
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
+  setMusicTrack(Math.floor(i / 5));
   setMusicMode('combat');
   // здоровье между уровнями НЕ восстанавливается само — только за улучшение «Лечение»
   P.hp = Math.min(P.maxHp, P.hp + 15*upLvl('heal'));
