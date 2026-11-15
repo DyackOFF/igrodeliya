@@ -26,7 +26,15 @@
     gap:6px;background:radial-gradient(900px 600px at 50% 35%,#1a2b16 0%,#0b1008 55%,#07080a 100%);
     z-index:5;text-align:center;padding:14px;overflow:auto}
   .screen.hidden{display:none}
-  .logo{height:min(120px,14vh);filter:drop-shadow(0 8px 26px rgba(182,212,58,.25))}
+  .logo{height:min(120px,14vh);cursor:pointer;filter:drop-shadow(0 8px 26px rgba(182,212,58,.25));
+    transition:filter .2s, transform .2s}
+  .logo:hover{filter:drop-shadow(0 8px 34px rgba(182,212,58,.5));transform:scale(1.04)}
+  .logoWrap{position:relative;display:inline-block}
+  .logoWrap:hover .devhint{opacity:1}
+  .devhint{position:absolute;left:calc(100% + 2px);top:52%;display:flex;align-items:center;gap:2px;
+    color:#8ea94a;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;
+    opacity:.55;transform:rotate(-6deg);transition:opacity .2s;
+    text-shadow:0 0 10px rgba(182,212,58,.25)}
   h1{margin:4px 0 0;font-size:clamp(20px,5vw,38px);letter-spacing:.16em;text-transform:uppercase;font-weight:800;
     color:#fff;text-shadow:0 0 26px rgba(182,212,58,.45)}
   h1 em{font-style:normal;color:var(--lime)}
@@ -142,7 +150,16 @@
 </div>
 
 <div id="menu" class="screen">
-  <img class="logo" src="logo.png" alt="Гимназия имени Н.В. Пушкова">
+  <div class="logoWrap">
+    <img class="logo" id="logoBtn" src="logo.png" alt="Гимназия имени Н.В. Пушкова" title="Разработчики">
+    <div class="devhint">
+      <svg width="42" height="30" viewBox="0 0 42 30" aria-hidden="true">
+        <path d="M38 26 C27 24 16 18 7 6" stroke="#8ea94a" stroke-width="2" fill="none" stroke-dasharray="4 3" opacity=".8"/>
+        <path d="M9 2 L15 9 L4 10 Z" fill="#8ea94a" opacity=".9"/>
+      </svg>
+      <span>разработчики</span>
+    </div>
+  </div>
   <h1>Crazy <em>Mountaine</em></h1>
   <div class="tag">30 уровней · 6 боссов · гимназия им. Н.В. Пушкова</div>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
@@ -152,7 +169,6 @@
     <button id="btnShop">Магазин</button>
     <button id="btnRecords">Мои рекорды</button>
     <button id="btnSettings">Настройки</button>
-    <button id="btnDevs">Разработчики</button>
     <button id="btnHelp">Управление</button>
   </div>
 </div>
@@ -1079,7 +1095,7 @@ $('btnPlay').onclick = () => { hide('menu'); openPick(); };
 $('btnShop').onclick = () => { hide('menu'); refreshShop(); show('shop'); };
 $('btnRecords').onclick = () => { hide('menu'); refreshRecords(); show('records'); };
 $('btnSettings').onclick = () => { hide('menu'); settingsFrom = 'menu'; syncSettings(); show('settings'); };
-$('btnDevs').onclick = () => { hide('menu'); show('devs'); };
+$('logoBtn').onclick = () => { sfx('click'); hide('menu'); show('devs'); };
 $('btnHelp').onclick = () => { hide('menu'); show('help'); };
 $('btnBack1').onclick = () => { hide('devs'); show('menu'); };
 $('btnBack2').onclick = () => { hide('help'); show('menu'); };
