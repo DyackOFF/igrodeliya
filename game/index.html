@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.9.5 (16.11)';
+const VERSION = 'v1.10.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -727,7 +727,14 @@ for (let b = 0; b < BIOMES.length; b++){
       quota: Math.round((10 + i*2.2) * (mod.id==='horde'?1.25:1)),
       rate: Math.max(.30, .95 - i*0.017),
       maxAlive: Math.min(34, 6 + Math.floor(i*0.9)),
-      types: ['slime','bat'].concat(i > 3 ? ['spitter'] : [], i > 8 ? ['brute'] : []),
+      types: ['slime','bat'].concat(
+        i > 2 ? ['spider'] : [],
+        i > 3 ? ['spitter'] : [],
+        i > 5 ? ['skull'] : [],
+        i > 7 ? ['splitter'] : [],
+        i > 9 ? ['skeleton'] : [],
+        i > 11 ? ['brute'] : []
+      ),
       hp: (1 + i*0.11) * mod.hp,
       speed: mod.speed, mod, fog: mod.fog,
       boss: boss ? BIOMES[b].kind : null,
@@ -848,12 +855,17 @@ const ENEMY = {
   slime:  {hp:14, speed:62,  r:20, dmg:12, xp:8,  spr:['slime0','slime1'], scale:44},
   bat:    {hp:9,  speed:118, r:15, dmg:9,  xp:6,  spr:['bat0','bat1','bat2','bat3'], scale:38},
   spitter:{hp:22, speed:52,  r:18, dmg:10, xp:14, spr:['slime0','slime1'], scale:40, ranged:true},
-  brute:  {hp:120,speed:48,  r:32, dmg:22, xp:32, spr:['slime0','slime1'], scale:82}
+  brute:  {hp:120,speed:48,  r:32, dmg:22, xp:32, spr:['slime0','slime1'], scale:82},
+  splitter: {hp:32, speed:74, r:22, dmg:14, xp:14, color:'#6fbf3a', scale:50, splits:true},
+  minisplit:{hp:10, speed:120,r:13, dmg:8,  xp:4,  color:'#8fdf5a', scale:28, mini:true},
+  spider:   {hp:20, speed:88, r:18, dmg:10, xp:12, color:'#8a6bff', scale:42, web:true},
+  skull:    {hp:12, speed:132,r:16, dmg:30, xp:10, color:'#e2e9ef', scale:34, kamikaze:true},
+  skeleton: {hp:32, speed:70, r:20, dmg:14, xp:16, color:'#ded7c4', scale:46, revive:true}
 };
 
 // ================= СОСТОЯНИЕ =================
 let state = 'menu';
-let P, bullets, ebullets, enemies, parts, clouds, map, MAP_W, MAP_H, cam,
+let P, bullets, ebullets, enemies, parts, clouds, webs, graves, map, MAP_W, MAP_H, cam,
     lvl, kills, levelTime, xp, xpNeed, plvl, stacks, bossRef, portal, toast, toastT,
     quota, spawnTimer, flow, flowT, rerolls, drumItem, drumOpen;
 let mode = 'manual';
@@ -872,7 +884,7 @@ function resetGame(){
   P.speed *= 1 + 0.05*upLvl('speed');
   P.xpMul += 0.10*upLvl('xp');
   P.goldMul = 1 + 0.15*upLvl('gold');
-  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[];
+  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; webs=[]; graves=[];
   lvl=0; kills=0; levelTime=0; xp=0; xpNeed=20; plvl=1; stacks={}; bossRef=null; portal=null;
   toast=''; toastT=0; quota=0; spawnTimer=1; flow=null; flowT=0;
 }
@@ -884,7 +896,7 @@ function startLevel(i){
   MAP_W = L.w; MAP_H = L.h;
   P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
   cam = {x:0,y:0};
-  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; bossRef=null; portal=null;
+  bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; webs=[]; graves=[]; bossRef=null; portal=null;
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
   setMusicTrack(Math.floor(i / 5));
@@ -1625,7 +1637,9 @@ function update(dt){
   const mag = Math.hypot(vx,vy);
   P.moving = mag > .05;
   if (P.moving){
-    const nx = vx/(mag||1), ny = vy/(mag||1), step = P.speed*dt;
+    let webSlow = 1;
+    for (const w of webs) if (Math.hypot(P.x-w.x, P.y-w.y) < w.r) webSlow = Math.min(webSlow, .5);
+    const nx = vx/(mag||1), ny = vy/(mag||1), step = P.speed*dt*webSlow;
     if (canStand(P.x+nx*step, P.y, 13)) P.x += nx*step;
     if (canStand(P.x, P.y+ny*step, 13)) P.y += ny*step;
     if (Math.abs(vx) > Math.abs(vy)) P.dir = vx>0?'right':'left'; else P.dir = vy>0?'down':'up';
@@ -1679,6 +1693,24 @@ function update(dt){
       } else { bullets.splice(i,1); continue; }
     }
     let gone = false;
+    // могилы можно расстрелять
+    for (const g of graves){
+      if (b.hit.has(g)) continue;
+      if (Math.hypot(g.x-b.x, g.y-b.y) < 26){
+        g.hp -= b.dmg;
+        b.hit.add(g);
+        parts.push({x:b.x,y:b.y,life:.14,max:.14,kind:'hit'});
+        if (g.hp <= 0){
+          const gi = graves.indexOf(g);
+          if (gi >= 0) graves.splice(gi,1);
+          parts.push({x:g.x, y:g.y, life:.4, max:.4, kind:'death', size:50});
+          sfx('kill');
+        }
+        if (--b.pierce <= 0){ bullets.splice(i,1); gone = true; }
+        break;
+      }
+    }
+    if (gone) continue;
     for (const en of enemies){
       if (b.hit.has(en)) continue;
       if (Math.hypot(en.x-b.x, en.y-b.y) < en.r + b.r){
@@ -1758,6 +1790,18 @@ function update(dt){
       hurtPlayer(en.dmg);
     }
 
+    // паук плетёт паутину
+    if (ENEMY[en.type] && ENEMY[en.type].web){
+      en.cd -= dt;
+      if (en.cd <= 0){ en.cd = 2.4; webs.push({x:en.x, y:en.y, r:46, life:5, max:5}); }
+    }
+    // черепок взрывается вблизи
+    if (ENEMY[en.type] && ENEMY[en.type].kamikaze && d < 44){
+      explode(en.x, en.y, en.dmg, 84);
+      if (Math.hypot(P.x-en.x, P.y-en.y) < 92) hurtPlayer(en.dmg);
+      en.hp = 0;
+    }
+
     // если монстр застрял на месте — телепортируем его в случайное место
     const moved = Math.hypot(en.x - (en.lastX === undefined ? en.x : en.lastX),
                              en.y - (en.lastY === undefined ? en.y : en.lastY));
@@ -1789,6 +1833,16 @@ function update(dt){
         clouds.push({x:en.x, y:en.y, r:68 + 14*(P.poison||1), life:2, max:2, tick:0, dmg:5 + 5*(P.poison||1)});
         sfx('poison');
       }
+      const def = ENEMY[en.type] || {};
+      if (def.splits){
+        for (let sp2 = 0; sp2 < 2; sp2++){
+          const a2 = Math.random()*6.28;
+          spawnEnemy('minisplit', {x:en.x + Math.cos(a2)*22, y:en.y + Math.sin(a2)*22});
+        }
+      }
+      if (def.revive){
+        graves.push({x:en.x, y:en.y, hp:44, maxHp:44, life:4, max:4});
+      }
       if (en.boss){
         bossRef = null;
         addGold(40 + lvl*8);
@@ -1815,6 +1869,18 @@ function update(dt){
     if (spawnTimer <= 0){
       spawnEnemy(L.types[Math.floor(Math.random()*L.types.length)]);
       spawnTimer = Math.max(.18, L.rate*(.7+Math.random()*.6));
+    }
+  }
+
+  // паутина и могилы
+  for (let i = webs.length-1; i >= 0; i--){ webs[i].life -= dt; if (webs[i].life <= 0) webs.splice(i,1); }
+  for (let i = graves.length-1; i >= 0; i--){
+    const g = graves[i];
+    g.life -= dt;
+    if (g.life <= 0){
+      graves.splice(i,1);
+      spawnEnemy('skeleton', {x:g.x, y:g.y});
+      parts.push({x:g.x, y:g.y, life:.5, max:.5, kind:'tp', size:50});
     }
   }
 
@@ -2035,6 +2101,37 @@ function render(){
   ctx.fillStyle = B.overlay; ctx.fillRect(0,0,W,H);
   ctx.globalCompositeOperation = 'source-over';
 
+  // паутина
+  for (const w of webs){
+    const wx = w.x - cam.x, wy = w.y - cam.y;
+    const k = Math.min(1, w.life / 2);
+    ctx.globalAlpha = .32 * k;
+    ctx.strokeStyle = '#b9a8ff'; ctx.lineWidth = 1.5;
+    for (let a2 = 0; a2 < 6; a2++){
+      ctx.beginPath(); ctx.moveTo(wx, wy);
+      ctx.lineTo(wx + Math.cos(a2*1.047)*w.r, wy + Math.sin(a2*1.047)*w.r); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(wx, wy, w.r*.6, 0, 6.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(wx, wy, w.r, 0, 6.3); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // могилы скелетов
+  for (const g of graves){
+    const gx = g.x - cam.x, gy = g.y - cam.y;
+    ctx.fillStyle = '#6b6350';
+    ctx.fillRect(gx-14, gy-6, 28, 20);
+    ctx.fillStyle = '#8d8270';
+    ctx.fillRect(gx-16, gy-10, 32, 6);
+    ctx.fillStyle = '#d8d2c0';
+    ctx.beginPath(); ctx.arc(gx, gy-2, 7, 0, 6.3); ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(gx-3, gy-3, 2, 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.arc(gx+3, gy-3, 2, 0, 6.3); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(gx-16, gy-24, 32, 5);
+    ctx.fillStyle = '#c0392b'; ctx.fillRect(gx-16, gy-24, 32*(1 - g.life/g.max), 5);
+  }
+
   // ядовитые облака
   for (const c of clouds){
     const cx = c.x - cam.x, cy = c.y - cam.y;
@@ -2093,10 +2190,43 @@ function render(){
       }
     } else {
       const def = ENEMY[en.type];
-      const key = def.spr[Math.floor(en.t*(en.type==='bat'?9:3)) % def.spr.length];
-      const im = IMG[key], s = en.scale;
-      if (im) ctx.drawImage(im, ex-s/2, ey-s/2, s, s);
-      else { ctx.fillStyle='#5fa832'; ctx.beginPath(); ctx.arc(ex,ey,en.r,0,6.3); ctx.fill(); }
+      const s = en.scale;
+      if (def.spr){
+        const key = def.spr[Math.floor(en.t*(en.type==='bat'?9:3)) % def.spr.length];
+        const im = IMG[key];
+        if (im) ctx.drawImage(im, ex-s/2, ey-s/2, s, s);
+        else { ctx.fillStyle='#5fa832'; ctx.beginPath(); ctx.arc(ex,ey,en.r,0,6.3); ctx.fill(); }
+      } else {
+        const col = def.color || '#6fbf3a';
+        if (en.type === 'spider'){
+          ctx.strokeStyle = col; ctx.lineWidth = 2;
+          for (let k = 0; k < 6; k++){
+            const a2 = en.t*4 + k*1.05;
+            ctx.beginPath(); ctx.moveTo(ex, ey);
+            ctx.lineTo(ex + Math.cos(a2)*s*.6, ey + Math.sin(a2)*s*.6); ctx.stroke();
+          }
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ex, ey, s*.3, 0, 6.3); ctx.fill();
+          ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(ex-s*.1, ey-s*.05, 2, 0, 6.3); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex+s*.1, ey-s*.05, 2, 0, 6.3); ctx.fill();
+        } else if (en.type === 'skull'){
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ex, ey, s*.36, 0, 6.3); ctx.fill();
+          ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(ex-s*.12, ey-s*.05, 3, 0, 6.3); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex+s*.12, ey-s*.05, 3, 0, 6.3); ctx.fill();
+          ctx.fillRect(ex-s*.14, ey+s*.12, s*.28, 3);
+        } else if (en.type === 'skeleton'){
+          ctx.fillStyle = col;
+          ctx.fillRect(ex-s*.18, ey-s*.1, s*.36, s*.5);
+          ctx.beginPath(); ctx.arc(ex, ey-s*.22, s*.24, 0, 6.3); ctx.fill();
+          ctx.fillStyle = '#111';
+          ctx.beginPath(); ctx.arc(ex-s*.08, ey-s*.24, 2, 0, 6.3); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex+s*.08, ey-s*.24, 2, 0, 6.3); ctx.fill();
+        } else {
+          ctx.fillStyle = col;
+          ctx.beginPath(); ctx.arc(ex, ey, s*.36, 0, 6.3); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,.25)';
+          ctx.beginPath(); ctx.arc(ex-s*.1, ey-s*.12, s*.12, 0, 6.3); ctx.fill();
+        }
+      }
       if (en.type === 'spitter'){ ctx.globalAlpha=.22; ctx.fillStyle='#a97bff';
         ctx.beginPath(); ctx.arc(ex,ey,en.r*.9,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
     }
@@ -2361,6 +2491,8 @@ function boot(){
   if (location.hash === '#play'){ meta.weapon='pistol'; startGame(); }
   if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
   if (location.hash === '#tut'){ startTutorial(); }
+  const lm = /^#lvl(\d+)$/.exec(location.hash);
+  if (lm){ meta.weapon='pistol'; startGame(); startLevel(Math.max(0, Math.min(29, +lm[1] - 1))); }
   const tm = /^#tut([1-6])$/.exec(location.hash);
   if (tm){ tutorial = true; startTutLesson(+tm[1] - 1); }
   requestAnimationFrame(loop);
@@ -2370,7 +2502,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get clouds(){ return clouds; }, get musicMode(){ return MUSIC.mode; },
+  get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get musicMode(){ return MUSIC.mode; },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
@@ -2380,7 +2512,7 @@ window.__game = {
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
-  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial,
+  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy,
   debugSetKills(n){ kills = n; }
 };
 })();
