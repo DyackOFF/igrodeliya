@@ -153,6 +153,7 @@
     <div class="goldbar"><span id="shopGold">Золото: 0</span></div>
     <h3 style="margin:6px 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7b8996">Улучшения</h3>
     <div id="shopRows"></div>
+    <button id="btnReset" class="small" style="width:100%;margin-top:8px">Сбросить улучшения (вернуть 50%)</button>
     <h3 style="margin:14px 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7b8996">Оружие</h3>
     <div id="weaponRows"></div>
     <button id="btnShopBack" style="margin-top:12px;width:100%">Назад</button>
@@ -281,12 +282,12 @@ function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta));
 const upLvl = id => meta.up[id] || 0;
 
 const META_UP = [
-  {id:'hp',    name:'Запас HP',  desc:'+15 HP на старте',    max:6, cost:l=>12+l*12},
-  {id:'dmg',   name:'Урон',      desc:'+8% к урону',         max:6, cost:l=>15+l*15},
-  {id:'speed', name:'Скорость',  desc:'+5% к бегу',          max:5, cost:l=>12+l*12},
-  {id:'xp',    name:'Опыт',      desc:'+10% опыта',          max:5, cost:l=>16+l*16},
-  {id:'gold',  name:'Удача',     desc:'+15% золота',         max:5, cost:l=>20+l*20},
-  {id:'heal',  name:'Лечение',   desc:'+15 HP после уровня', max:5, cost:l=>10+l*10}
+  {id:'hp',    name:'Запас HP',  desc:'+15 HP на старте',    max:6, cost:l=>120+l*120},
+  {id:'dmg',   name:'Урон',      desc:'+8% к урону',         max:6, cost:l=>150+l*150},
+  {id:'speed', name:'Скорость',  desc:'+5% к бегу',          max:5, cost:l=>120+l*120},
+  {id:'xp',    name:'Опыт',      desc:'+10% опыта',          max:5, cost:l=>160+l*160},
+  {id:'gold',  name:'Удача',     desc:'+15% золота',         max:5, cost:l=>200+l*200},
+  {id:'heal',  name:'Лечение',   desc:'+15 HP после уровня', max:5, cost:l=>100+l*100}
 ];
 
 // ================= АССЕТЫ =================
@@ -818,8 +819,20 @@ function refreshMenu(){
   $('menuGold').textContent = 'Золото: ' + meta.gold;
   $('menuBest').textContent = 'Рекорд: ' + (meta.best ? 'уровень ' + meta.best : '—');
 }
+function spentOnUpgrades(){
+  let sum = 0;
+  for (const u of META_UP){
+    const l = upLvl(u.id);
+    for (let k = 0; k < l; k++) sum += u.cost(k);
+  }
+  return sum;
+}
 function refreshShop(){
   $('shopGold').textContent = 'Золото: ' + meta.gold;
+  const spent = spentOnUpgrades(), refund = Math.floor(spent * 0.5);
+  const rb = $('btnReset');
+  rb.textContent = spent ? `Сбросить улучшения (вернуть ${refund})` : 'Сбросить улучшения — нечего сбрасывать';
+  rb.disabled = !spent;
   const box = $('shopRows'); box.innerHTML = '';
   for (const u of META_UP){
     const l = upLvl(u.id), maxed = l >= u.max, cost = maxed ? 0 : u.cost(l);
@@ -874,6 +887,15 @@ $('btnBack2').onclick = () => { hide('help'); show('menu'); };
 $('btnBackSettings').onclick = () => { hide('settings'); show('menu'); refreshMenu(); };
 $('btnShopBack').onclick = () => { hide('shop'); show('menu'); refreshMenu(); };
 $('btnRecordsBack').onclick = () => { hide('records'); show('menu'); refreshMenu(); };
+$('btnReset').onclick = () => {
+  const spent = spentOnUpgrades();
+  if (!spent) return;
+  const refund = Math.floor(spent * 0.5);
+  if (!confirm(`Сбросить все улучшения и вернуть ${refund} золота (50% от потраченного)?`)) return;
+  meta.up = {};
+  meta.gold += refund;
+  saveMeta(); refreshShop(); refreshMenu();
+};
 
 function openPick(){
   const box = $('pickCards'); box.innerHTML = '';
