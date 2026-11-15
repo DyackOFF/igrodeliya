@@ -1034,7 +1034,9 @@ function nearestEnemy(){
 function aimAngle(){
   if (mode === 'auto'){ const e = nearestEnemy(); if (e) return Math.atan2(e.y-P.y, e.x-P.x); return P.aim||0; }
   if (input.aimActive) return Math.atan2(input.aimY, input.aimX);
-  return Math.atan2(mouse.y-P.y, mouse.x-P.x);
+  // мышь задана в экранных координатах — переводим в мировые
+  const wx = mouse.x + (cam ? cam.x : 0), wy = mouse.y + (cam ? cam.y : 0);
+  return Math.atan2(wy - P.y, wx - P.x);
 }
 const wantFire = () => mode === 'auto' ? true : (input.fireHeld || mouse.down || keys.has(' ') || padFire);
 
@@ -1997,7 +1999,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get mode(){ return mode; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
+  get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
