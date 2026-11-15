@@ -236,7 +236,11 @@
       <input type="range" id="musRange" min="0" max="100" value="35" style="flex:1">
       <button id="btnMusic" class="small">Выкл</button>
     </div>
-    <p>Звуки <span id="volLabel">60%</span></p>
+    <p>Звуки стрельбы</p>
+    <div style="margin-bottom:10px">
+      <button id="btnShots" class="small" style="width:100%">Выкл</button>
+    </div>
+    <p>Прочие звуки <span id="volLabel">60%</span></p>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <input type="range" id="volRange" min="0" max="100" value="60" style="flex:1">
       <button id="btnMute" class="small">Выкл</button>
@@ -425,6 +429,7 @@ function sfx(type){
 
   switch (type){
     case 'shoot': {
+      if (meta.shotSound === 0) break;
       const S = {
         pistol:  [420, .07, 'sine',     180, .26],
         dual:    [460, .06, 'sine',     200, .22],
@@ -539,7 +544,7 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
 
 // ================= МЕТА =================
 const META_KEY = 'crazy_mountaine_meta_v2';
-let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, vol:60, music:1, musicVol:35, layout:'auto'};
+let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, shotSound:1, vol:60, music:1, musicVol:35, layout:'auto'};
 try { const raw = localStorage.getItem(META_KEY); if (raw) meta = Object.assign(meta, JSON.parse(raw)); } catch(e){}
 layoutMode = meta.layout || 'auto';
 function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e){} }
@@ -1229,6 +1234,7 @@ function syncSettings(){
   $('musRange').value = meta.musicVol === undefined ? 35 : meta.musicVol;
   $('musLabel').textContent = (meta.musicVol === undefined ? 35 : meta.musicVol) + '%';
   $('btnMusic').textContent = meta.music === 0 ? 'Вкл' : 'Выкл';
+  $('btnShots').textContent = meta.shotSound === 0 ? 'Включить' : 'Выключить';
 }
 $('btnPause').onclick = () => togglePause();
 $('btnSound').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; meta.vol = meta.vol || 60; saveMeta(); syncSettings(); sfx('click'); };
@@ -1253,6 +1259,9 @@ $('musRange').oninput = e => {
 $('btnMusic').onclick = () => {
   meta.music = meta.music === 0 ? 1 : 0; saveMeta(); syncSettings();
   if (meta.music === 0) stopMusic(); else if (state === 'play') startMusic();
+};
+$('btnShots').onclick = () => {
+  meta.shotSound = meta.shotSound === 0 ? 1 : 0; saveMeta(); syncSettings();
 };
 function setLayout(m){
   layoutMode = m; meta.layout = m; saveMeta(); applyLayout(); syncSettings();
