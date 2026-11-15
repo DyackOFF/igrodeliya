@@ -375,7 +375,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.12.0 (16.11)';
+const VERSION = 'v1.13.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -510,35 +510,48 @@ function sfx(type){
 }
 
 // ================= МУЗЫКА =================
-const MUSIC = {timer: null, step: 0, mode: 'combat', track: 0};
-const TRACKS = [
-  // 6 разных треков — по одному на каждые 5 уровней (после каждого босса новый)
-  {step:125, root:110, bass:[0,0,7,0,3,0,10,0,0,0,5,0,7,0,3,0],   lead:[0,7,3,10],  kick:[0,6,10],      snare:[4,12],      hat:2},
-  {step:118, root:98,  bass:[0,5,0,3,0,8,0,7,0,5,0,2,0,7,0,3],   lead:[5,3,8,12],  kick:[0,3,8,11],    snare:[4,12],      hat:2},
-  {step:136, root:87,  bass:[0,0,0,7,0,0,10,0,0,5,0,0,3,0,7,0],  lead:[0,3,7,5],   kick:[0,7,10],      snare:[6,14],      hat:4},
-  {step:110, root:104, bass:[0,2,0,7,0,5,0,3,0,10,0,7,0,3,0,12], lead:[10,7,12,15],kick:[0,2,8,10],    snare:[4,12,14],   hat:2},
-  {step:122, root:92,  bass:[0,0,3,0,7,0,10,0,0,12,0,10,7,0,3,0],lead:[3,10,5,12], kick:[0,6,10,13],   snare:[4,12],      hat:2},
-  {step:105, root:123, bass:[0,7,0,3,0,10,0,5,0,3,0,7,0,12,0,10],lead:[12,10,7,15],kick:[0,4,8,12],    snare:[2,6,10,14], hat:2}
+// Планировщик на точных часах WebAudio: ритм не плывёт от таймеров JS.
+const MUSIC = {
+  timer: null, nextTime: 0, step: 0, bar: 0,
+  mode: 'menu', style: 0, phrase: null, running: false, bpm: 148
+};
+
+const STYLES = [
+  {bpm:148, root:110, scale:[0,2,3,5,7,8,10], prog:[0,-2,-4,-2]},
+  {bpm:140, root:98,  scale:[0,2,3,5,7,9,10], prog:[0,3,5,3]},
+  {bpm:132, root:87,  scale:[0,1,3,5,6,8,10], prog:[0,-3,-5,-3]},
+  {bpm:156, root:104, scale:[0,2,4,5,7,9,11], prog:[0,5,3,7]},
+  {bpm:144, root:92,  scale:[0,3,5,7,10,12,15], prog:[0,-2,3,-4]},
+  {bpm:152, root:123, scale:[0,2,3,6,7,10,12], prog:[0,-1,-5,-3]}
 ];
-function musicNote(a, freq, dur, vol, wave, attack){
+
+const MENU_MEL = [12, 10, 7, 10, 12, 15, 14, 12, 10, 7, 5, 7, 10, 12, 10, 7];
+const MENU_PROG = [0, -3, -5, -7];
+
+function musicVolume(){
+  if (meta.music === 0) return 0;
+  const v = (meta.musicVol === undefined ? 35 : meta.musicVol) / 100;
+  return Math.max(0, v);
+}
+
+function mNote(a, freq, t, dur, vol, wave, attack){
   const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
   o.type = wave || 'triangle';
-  o.frequency.value = freq;
-  f.type = 'lowpass'; f.frequency.value = 1800;
-  const t = a.currentTime;
+  o.frequency.setValueAtTime(freq, t);
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(2400, t);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.linearRampToValueAtTime(vol, t + (attack || 0.05));
+  g.gain.linearRampToValueAtTime(vol, t + (attack || 0.012));
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(f); f.connect(g); g.connect(a.destination);
   o.start(t); o.stop(t + dur + 0.05);
 }
-function perc(a, kind, vol){
-  const t = a.currentTime;
+function mPerc(a, kind, t, vol){
   if (kind === 'kick'){
     const o = a.createOscillator(), g = a.createGain();
     o.type = 'sine';
     o.frequency.setValueAtTime(150, t);
-    o.frequency.exponentialRampToValueAtTime(45, t + 0.16);
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.14);
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
     o.connect(g); g.connect(a.destination);
@@ -546,7 +559,8 @@ function perc(a, kind, vol){
   } else {
     const n = noise(); if (!n) return;
     const f = a.createBiquadFilter(), g = a.createGain();
-    f.type = 'highpass'; f.frequency.value = kind === 'snare' ? 1800 : 7000;
+    f.type = 'highpass';
+    f.frequency.setValueAtTime(kind === 'snare' ? 1700 : 7200, t);
     const dur = kind === 'snare' ? 0.12 : 0.035;
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -554,74 +568,115 @@ function perc(a, kind, vol){
     n.start(t); n.stop(t + dur + 0.02);
   }
 }
-function musicRoot(){
-  const T = TRACKS[MUSIC.track] || TRACKS[0];
-  return T.root;
+function newPhrase(scale){
+  const ph = [];
+  for (let i = 0; i < 8; i++) ph.push(i % 2 === 0 ? scale[Math.floor(Math.random()*scale.length)] : null);
+  return ph;
 }
-function musicTick(){
+
+function musicStep(t){
   const a = audio(); if (!a) return;
-  if (meta.music === 0) return;
-  const vol = (meta.musicVol === undefined ? 35 : meta.musicVol) / 100;
+  const vol = musicVolume();
   if (vol <= 0) return;
-  const root = musicRoot();
-  const s = MUSIC.step++;
+  const s = MUSIC.step, bar = MUSIC.bar;
 
-  if (MUSIC.mode === 'calm'){
-    // спокойный эмбиент: редкие ноты и мягкие аккорды
-    const chord = [0, 7, 12, 10];
-    const n = chord[s % chord.length];
-    musicNote(a, root * Math.pow(2, n/12), 1.6, vol * 0.10, 'sine', 0.25);
-    if (s % 4 === 0) musicNote(a, root * 0.5, 2.4, vol * 0.14, 'sine', 0.4);
-    if (s % 8 === 4) musicNote(a, root * Math.pow(2, 7/12) * 2, 1.4, vol * 0.06, 'triangle', 0.3);
-    return;
+  if (MUSIC.mode === 'menu'){
+    // заглавная тема: медленная, узнаваемая
+    const chord = MENU_PROG[Math.floor(bar / 2) % MENU_PROG.length];
+    const root = 98 * Math.pow(2, chord / 12);
+    if (s === 0) mNote(a, root * 0.5, t, 1.6, vol * 0.22, 'sine', 0.08);
+    if (s === 0 || s === 8) mNote(a, root, t, 1.1, vol * 0.10, 'triangle', 0.05);
+    if (s % 2 === 0){
+      const n = MENU_MEL[(s / 2 + bar * 8) % MENU_MEL.length];
+      mNote(a, root * Math.pow(2, n / 12) * 2, t, 0.45, vol * 0.15, 'triangle', 0.02);
+    }
+    if (s % 4 === 2) mPerc(a, 'hat', t, vol * 0.03);
+  } else if (MUSIC.mode === 'calm'){
+    const chord = [0, 7, 12, 10][Math.floor(s / 4) % 4];
+    mNote(a, 110 * Math.pow(2, chord / 12), t, 1.6, vol * 0.08, 'sine', 0.3);
+    if (s % 4 === 0) mNote(a, 55, t, 2.2, vol * 0.12, 'sine', 0.4);
+  } else {
+    const st = STYLES[MUSIC.style] || STYLES[0];
+    const root = st.root;
+    const section = Math.floor(bar / 8) % 3;
+    const loud = [0.75, 1, 1.15][section];
+    const chord = st.prog[Math.floor(bar / 2) % st.prog.length];
+
+    // ударные — ровная сетка, без сбоев
+    const kicks = (Math.floor(bar / 4) % 2 === 0) ? [0, 6, 10] : [0, 3, 8, 11];
+    if (kicks.indexOf(s) >= 0) mPerc(a, 'kick', t, vol * 0.5 * loud);
+    if (s === 4 || s === 12) mPerc(a, 'snare', t, vol * 0.22 * loud);
+    if (s === 15 && bar % 8 === 7) mPerc(a, 'snare', t, vol * 0.18);
+    if (s % 2 === 0) mPerc(a, 'hat', t, vol * (s % 4 === 0 ? 0.09 : 0.05) * loud);
+
+    // бас
+    if (s === 0 || s === 3 || s === 6 || s === 8 || s === 11 || s === 14){
+      mNote(a, root * Math.pow(2, (chord + 0) / 12) * 0.5, t, 0.13, vol * 0.30 * loud, 'sawtooth', 0.008);
+    }
+
+    // мелодия: фраза на такт, с мутацией
+    if (!MUSIC.phrase || s === 0){
+      const keep = MUSIC.phrase && Math.random() < 0.55;
+      if (!keep) MUSIC.phrase = newPhrase(st.scale);
+      else {
+        const idx = Math.floor(Math.random() * 8);
+        MUSIC.phrase[idx] = st.scale[Math.floor(Math.random()*st.scale.length)];
+      }
+    }
+    if (s % 2 === 0){
+      const n = MUSIC.phrase[s / 2];
+      if (n !== null && n !== undefined){
+        mNote(a, root * Math.pow(2, (n + chord) / 12) * 2, t, 0.16, vol * 0.16 * loud, 'triangle', 0.008);
+      }
+    }
   }
 
-  // боевой режим: у каждого трека свой рисунок
-  const T = TRACKS[MUSIC.track] || TRACKS[0];
-  const b = s % 16, bar = Math.floor(s / 16);
-  const shift = ((Math.floor(bar / 2) % 2) ? -2 : 0) / 12;
+  MUSIC.step++;
+  if (MUSIC.step >= 16){ MUSIC.step = 0; MUSIC.bar++; }
+}
 
-  if (T.kick.indexOf(b) >= 0) perc(a, 'kick', vol * 0.5);
-  if (T.snare.indexOf(b) >= 0) perc(a, 'snare', vol * 0.22);
-  if (b % T.hat === 0) perc(a, 'hat', vol * 0.08 + (b % 4 === 0 ? vol * 0.04 : 0));
-
-  if (T.bass[b]){
-    musicNote(a, root * Math.pow(2, (T.bass[b] + shift*12) / 12) * 0.5, 0.12, vol * 0.3, 'sawtooth', 0.01);
-  }
-  if (b % 4 === 0){
-    const n = T.lead[Math.floor(b / 4) % T.lead.length];
-    musicNote(a, root * Math.pow(2, (n + shift*12) / 12) * 2, 0.14, vol * 0.16, 'triangle', 0.01);
+function musicScheduler(){
+  const a = audio();
+  if (!a || !MUSIC.running) return;
+  if (MUSIC.nextTime < a.currentTime) MUSIC.nextTime = a.currentTime + 0.05;
+  const ahead = 0.15;
+  let guard = 0;
+  while (MUSIC.nextTime < a.currentTime + ahead && guard++ < 64){
+    musicStep(MUSIC.nextTime);
+    MUSIC.nextTime += 60 / MUSIC.bpm / 4;
   }
 }
+
 function startMusic(){
   if (meta.music === 0) return;
-  if (MUSIC.timer) return;
   audio();
-  MUSIC.step = 0;
-  musicTick();
-  MUSIC.timer = setInterval(musicTick, MUSIC.mode === 'calm' ? 620 : 125);
+  if (MUSIC.running) return;
+  MUSIC.running = true;
+  MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
+  MUSIC.nextTime = (audio().currentTime || 0) + 0.08;
+  MUSIC.timer = setInterval(musicScheduler, 25);
+}
+function stopMusic(){
+  MUSIC.running = false;
+  if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
 }
 function setMusicMode(m){
   if (MUSIC.mode === m) return;
   MUSIC.mode = m;
-  MUSIC.step = 0;
-  if (MUSIC.timer){
-    clearInterval(MUSIC.timer);
-    MUSIC.timer = setInterval(musicTick, m === 'calm' ? 620 : (TRACKS[MUSIC.track] || TRACKS[0]).step);
-  }
+  MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
+  if (m === 'menu') MUSIC.bpm = 96;
+  else if (m === 'calm') MUSIC.bpm = 84;
+  else MUSIC.bpm = (STYLES[MUSIC.style] || STYLES[0]).bpm;
+  const a = audio();
+  MUSIC.nextTime = (a ? a.currentTime : 0) + 0.06;
+  if (!MUSIC.running && meta.music !== 0) startMusic();
 }
 function setMusicTrack(i){
-  i = Math.max(0, Math.min(TRACKS.length - 1, i));
-  if (MUSIC.track === i) return;
-  MUSIC.track = i;
-  MUSIC.step = 0;
-  if (MUSIC.timer){
-    clearInterval(MUSIC.timer);
-    MUSIC.timer = setInterval(musicTick, MUSIC.mode === 'calm' ? 620 : (TRACKS[i] || TRACKS[0]).step);
-  }
-}
-function stopMusic(){
-  if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
+  i = Math.max(0, Math.min(STYLES.length - 1, i));
+  if (MUSIC.style === i) return;
+  MUSIC.style = i;
+  MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
+  if (MUSIC.mode === 'combat') MUSIC.bpm = STYLES[i].bpm;
 }
 
 // ================= ГЕЙМПАД =================
@@ -1477,7 +1532,7 @@ $('btnFull').onclick = () => {
   } catch(e){}
 };
 $('btnResume').onclick = () => togglePause();
-$('btnPauseMenu').onclick = () => { stopMusic(); hide('pause'); show('menu'); state = 'menu'; refreshMenu(); showHud(false); updateTouchVisibility(); };
+$('btnPauseMenu').onclick = () => { hide('pause'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); showHud(false); updateTouchVisibility(); };
 $('btnPauseSettings').onclick = () => { settingsFrom = 'pause'; hide('pause'); syncSettings(); show('settings'); };
 $('volRange').oninput = e => {
   meta.vol = +e.target.value; meta.sound = meta.vol > 0 ? 1 : 0;
@@ -1603,7 +1658,8 @@ function nextTutLesson(){
 $('btnTutNext').onclick = () => { sfx('click'); nextTutLesson(); };
 function endTutorial(){
   tutorial = false;
-  stopMusic();
+  setMusicMode('menu');
+  startMusic();
   state = 'menu';
   show('menu'); showHud(false); refreshMenu(); updateTouchVisibility();
   resetKbd();
@@ -2141,7 +2197,7 @@ function winGame(){
 }
 $('btnAgain').onclick = () => {
   saveRecord($('nameInput2').value || 'Безымянный');
-  hide('final'); show('menu'); state = 'menu'; refreshMenu(); updateTouchVisibility();
+  hide('final'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); updateTouchVisibility();
 };
 function gameOver(){
   state = 'over'; sfx('lose'); saveMeta();
@@ -2153,7 +2209,7 @@ function gameOver(){
   $('btnNext').textContent = 'Сохранить и в меню';
   $('btnNext').onclick = () => {
     saveRecord($('nameInput').value || 'Безымянный');
-    hide('levelend'); show('menu'); state = 'menu'; refreshMenu(); updateTouchVisibility();
+    hide('levelend'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); updateTouchVisibility();
   };
   show('levelend'); stopMusic(); showHud(false); updateTouchVisibility();
 }
@@ -2621,6 +2677,9 @@ function boot(){
   setMode(useTouch ? 'auto' : 'manual');
   syncSettings();
   refreshMenu();
+  MUSIC.mode = 'menu';
+  MUSIC.bpm = 96;
+  startMusic();
   if (location.hash === '#play'){ meta.weapon='pistol'; startGame(); }
   if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
   if (location.hash === '#tut'){ startTutorial(); }
@@ -2635,7 +2694,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get pendingSkel(){ return pendingSkel; }, get musicMode(){ return MUSIC.mode; },
+  get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get pendingSkel(){ return pendingSkel; }, get musicMode(){ return MUSIC.mode; }, musicTickPublic(){ musicScheduler(); },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
