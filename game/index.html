@@ -376,7 +376,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.8.1 (16.11)';
+const VERSION = 'v1.9.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1608,6 +1608,15 @@ function update(dt){
   if (P.shieldMax && P.shield < P.shieldMax){ P.shieldT += dt; if (P.shieldT >= Math.max(6, 12 - 2*P.shieldMax)){ P.shieldT = 0; P.shield++; } }
   if (toastT > 0) toastT -= dt;
 
+  // каждые 30 секунд враги ускоряются на 10%
+  const rampStep = Math.floor(levelTime / 30);
+  if (rampStep > (P.rampSeen || 0)){
+    P.rampSeen = rampStep;
+    toast = `ВРАГИ УСКОРИЛИСЬ ×${(1 + 0.1*rampStep).toFixed(1)}`;
+    toastT = 2.5;
+    sfx('levelup');
+  }
+
   let vx = input.moveX, vy = input.moveY;
   if (keys.has('left')) vx -= 1;
   if (keys.has('right')) vx += 1;
@@ -1721,14 +1730,15 @@ function update(dt){
     const dx = P.x-en.x, dy = P.y-en.y, d = Math.hypot(dx,dy)||1;
     const ux = dx/d, uy = dy/d;
     const slowMul = en.slowT > 0 ? Math.max(.28, .55 - .11*Math.max(0, P.slow-1)) : 1;
+    const enRamp = 1 + 0.1 * Math.floor(levelTime / 30);
     const tgt = flowTarget(en);
     const tx = tgt ? tgt.x : P.x, ty = tgt ? tgt.y : P.y;
     const tdx = tx-en.x, tdy = ty-en.y, td = Math.hypot(tdx,tdy)||1;
 
     if (en.boss) bossUpdate(en, dt, d, ux, uy, slowMul);
     else if (en.type === 'spitter'){
-      if (d > 260) moveWithCollision(en, tdx/td*en.speed*slowMul*dt, tdy/td*en.speed*slowMul*dt);
-      else if (d < 170) moveWithCollision(en, -ux*en.speed*slowMul*dt*.6, -uy*en.speed*slowMul*dt*.6);
+      if (d > 260) moveWithCollision(en, tdx/td*en.speed*slowMul*enRamp*dt, tdy/td*en.speed*slowMul*enRamp*dt);
+      else if (d < 170) moveWithCollision(en, -ux*en.speed*slowMul*enRamp*dt*.6, -uy*en.speed*slowMul*enRamp*dt*.6);
       en.cd -= dt;
       if (en.cd <= 0 && d < 430){
         en.cd = 1.8+Math.random();
@@ -1738,9 +1748,9 @@ function update(dt){
     } else if (en.type === 'bat'){
       en.x += Math.cos(en.t*6+en.phase)*40*dt;
       en.y += Math.sin(en.t*7+en.phase)*40*dt;
-      moveWithCollision(en, tdx/td*en.speed*slowMul*dt, tdy/td*en.speed*slowMul*dt);
+      moveWithCollision(en, tdx/td*en.speed*slowMul*enRamp*dt, tdy/td*en.speed*slowMul*enRamp*dt);
     } else {
-      moveWithCollision(en, tdx/td*en.speed*slowMul*dt, tdy/td*en.speed*slowMul*dt);
+      moveWithCollision(en, tdx/td*en.speed*slowMul*enRamp*dt, tdy/td*en.speed*slowMul*enRamp*dt);
     }
 
     if (d < en.r+15){
@@ -1840,7 +1850,7 @@ function update(dt){
 
 function bossUpdate(en, dt, d, ux, uy, slowMul){
   en.cd -= dt;
-  const sp = en.speed*slowMul;
+  const sp = en.speed*slowMul*(1 + 0.1 * Math.floor(levelTime / 30));
   // к герою идём по волновой карте, чтобы не застревать в стенах
   const tgt = flowTarget(en);
   let fx = ux, fy = uy;
