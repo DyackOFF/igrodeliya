@@ -230,7 +230,12 @@
       <button id="btnLayoutLand">Вид: горизонтальный</button>
       <button id="btnLayoutPort">Вид: вертикальный</button>
     </div>
-    <p>Звук <span id="volLabel">60%</span></p>
+    <p>Музыка <span id="musLabel">35%</span></p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input type="range" id="musRange" min="0" max="100" value="35" style="flex:1">
+      <button id="btnMusic" class="small">Выкл</button>
+    </div>
+    <p>Звуки <span id="volLabel">60%</span></p>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <input type="range" id="volRange" min="0" max="100" value="60" style="flex:1">
       <button id="btnMute" class="small">Выкл</button>
@@ -431,6 +436,47 @@ function sfx(type){
   }
 }
 
+// ================= МУЗЫКА =================
+const MUSIC = {timer: null, step: 0};
+function musicNote(a, freq, dur, vol, wave, attack){
+  const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+  o.type = wave || 'triangle';
+  o.frequency.value = freq;
+  f.type = 'lowpass'; f.frequency.value = 1400;
+  const t = a.currentTime;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + (attack || 0.06));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(f); f.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function musicTick(){
+  const a = audio(); if (!a) return;
+  if (meta.music === 0) return;
+  const vol = (meta.musicVol === undefined ? 35 : meta.musicVol) / 100;
+  if (vol <= 0) return;
+  const biome = (typeof lvl === 'number' && LEVELS[lvl]) ? LEVELS[lvl].biome : 0;
+  const roots = [110, 98, 87, 104, 92, 123];
+  const root = roots[biome] || 110;
+  const scale = [0, 3, 5, 7, 10, 12, 15];
+  const s = MUSIC.step++;
+  const n = scale[(s * 3) % scale.length];
+  musicNote(a, root * Math.pow(2, n/12) * 2, 0.85, vol * 0.16, 'triangle');
+  if (s % 4 === 0) musicNote(a, root, 1.7, vol * 0.22, 'sine', 0.12);
+  if (s % 8 === 4) musicNote(a, root * 1.5, 1.3, vol * 0.10, 'sine', 0.2);
+}
+function startMusic(){
+  if (meta.music === 0) return;
+  if (MUSIC.timer) return;
+  audio();
+  MUSIC.step = 0;
+  musicTick();
+  MUSIC.timer = setInterval(musicTick, 460);
+}
+function stopMusic(){
+  if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
+}
+
 // ================= ГЕЙМПАД =================
 let padFire = false, padPausePrev = false;
 function readPad(){
@@ -468,7 +514,7 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
 
 // ================= МЕТА =================
 const META_KEY = 'crazy_mountaine_meta_v2';
-let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, vol:60, layout:'auto'};
+let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, vol:60, music:1, musicVol:35, layout:'auto'};
 try { const raw = localStorage.getItem(META_KEY); if (raw) meta = Object.assign(meta, JSON.parse(raw)); } catch(e){}
 layoutMode = meta.layout || 'auto';
 function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e){} }
@@ -1122,8 +1168,8 @@ $('btnRecordsBack').onclick = () => { hide('records'); show('menu'); refreshMenu
 let settingsFrom = 'menu';
 function showHud(on){ $('hudbtns').classList.toggle('on', on); }
 function togglePause(){
-  if (state === 'play'){ state = 'pause'; sfx('click'); show('pause'); showHud(false); updateTouchVisibility(); }
-  else if (state === 'pause'){ state = 'play'; hide('pause'); showHud(true); updateTouchVisibility(); }
+  if (state === 'play'){ state = 'pause'; sfx('click'); stopMusic(); show('pause'); showHud(false); updateTouchVisibility(); }
+  else if (state === 'pause'){ state = 'play'; hide('pause'); showHud(true); startMusic(); updateTouchVisibility(); }
 }
 function syncSettings(){
   $('btnModeManual').classList.toggle('on', mode === 'manual');
@@ -1134,6 +1180,9 @@ function syncSettings(){
   $('volRange').value = meta.vol === undefined ? 60 : meta.vol;
   $('volLabel').textContent = (meta.vol === undefined ? 60 : meta.vol) + '%';
   $('btnMute').textContent = meta.sound === 0 ? 'Вкл' : 'Выкл';
+  $('musRange').value = meta.musicVol === undefined ? 35 : meta.musicVol;
+  $('musLabel').textContent = (meta.musicVol === undefined ? 35 : meta.musicVol) + '%';
+  $('btnMusic').textContent = meta.music === 0 ? 'Вкл' : 'Выкл';
 }
 $('btnPause').onclick = () => togglePause();
 $('btnSound').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; meta.vol = meta.vol || 60; saveMeta(); syncSettings(); sfx('click'); };
@@ -1144,13 +1193,21 @@ $('btnFull').onclick = () => {
   } catch(e){}
 };
 $('btnResume').onclick = () => togglePause();
-$('btnPauseMenu').onclick = () => { hide('pause'); show('menu'); state = 'menu'; refreshMenu(); showHud(false); updateTouchVisibility(); };
+$('btnPauseMenu').onclick = () => { stopMusic(); hide('pause'); show('menu'); state = 'menu'; refreshMenu(); showHud(false); updateTouchVisibility(); };
 $('btnPauseSettings').onclick = () => { settingsFrom = 'pause'; hide('pause'); syncSettings(); show('settings'); };
 $('volRange').oninput = e => {
   meta.vol = +e.target.value; meta.sound = meta.vol > 0 ? 1 : 0;
   $('volLabel').textContent = meta.vol + '%'; saveMeta(); syncSettings();
 };
 $('btnMute').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; saveMeta(); syncSettings(); };
+$('musRange').oninput = e => {
+  meta.musicVol = +e.target.value; meta.music = meta.musicVol > 0 ? 1 : 0;
+  $('musLabel').textContent = meta.musicVol + '%'; saveMeta(); syncSettings();
+};
+$('btnMusic').onclick = () => {
+  meta.music = meta.music === 0 ? 1 : 0; saveMeta(); syncSettings();
+  if (meta.music === 0) stopMusic(); else if (state === 'play') startMusic();
+};
 function setLayout(m){
   layoutMode = m; meta.layout = m; saveMeta(); applyLayout(); syncSettings();
 }
@@ -1214,10 +1271,12 @@ function startTutorial(){
   ['menu','shop','settings','devs','help','levelend','final','pick','records','pause'].forEach(hide);
   state = 'play';
   showHud(true);
+  startMusic();
   updateTouchVisibility();
 }
 function endTutorial(){
   tutorial = false;
+  stopMusic();
   state = 'menu';
   show('menu'); showHud(false); refreshMenu(); updateTouchVisibility();
 }
@@ -1230,6 +1289,7 @@ function startGame(){
   state = 'play';
   startLevel(0);
   showHud(true);
+  startMusic();
   updateTouchVisibility();
 }
 
@@ -1496,6 +1556,7 @@ function enterPortal(){
   $('nameBox').style.display = 'none';
   $('btnNext').textContent = (lvl+1 >= TOT) ? 'Финал' : ((lvl+1) % 5 === 0 ? 'Босс!' : 'Дальше');
   show('levelend');
+  stopMusic();
   showHud(false);
 }
 function nextLevel(){
@@ -1504,6 +1565,7 @@ function nextLevel(){
   startLevel(lvl+1);
   state = 'play';
   showHud(true);
+  startMusic();
   updateTouchVisibility();
 }
 function winGame(){
@@ -1511,7 +1573,7 @@ function winGame(){
   addGold(150); meta.best = TOT; saveMeta();
   $('finalStats').innerHTML = `<span>Убито: <b>${kills}</b></span><span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
   $('nameInput2').value = meta.lastName || '';
-  show('final'); state = 'win'; showHud(false); updateTouchVisibility();
+  show('final'); state = 'win'; stopMusic(); showHud(false); updateTouchVisibility();
 }
 $('btnAgain').onclick = () => {
   saveRecord($('nameInput2').value || 'Безымянный');
@@ -1529,7 +1591,7 @@ function gameOver(){
     saveRecord($('nameInput').value || 'Безымянный');
     hide('levelend'); show('menu'); state = 'menu'; refreshMenu(); updateTouchVisibility();
   };
-  show('levelend'); showHud(false); updateTouchVisibility();
+  show('levelend'); stopMusic(); showHud(false); updateTouchVisibility();
 }
 function saveRecord(name){
   meta.lastName = name;
