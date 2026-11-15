@@ -14,13 +14,13 @@
   html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;touch-action:none;
     font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--txt);user-select:none}
   #wrap{position:fixed;inset:0;display:grid;place-items:center;background:#07080a}
-  canvas{image-rendering:pixelated;display:block;
-    width:min(100vw, calc(100vh * 1.6)); height:min(60vw, 100vh);
-    box-shadow:0 0 90px rgba(0,0,0,.9)}
-  @media (max-aspect-ratio: 1/1){
-    #wrap{place-items:start center;padding-top:8vh}
-    canvas{width:100vw;height:auto}
-  }
+  canvas{image-rendering:pixelated;display:block;box-shadow:0 0 90px rgba(0,0,0,.9)}
+
+  #hudbtns{position:fixed;right:10px;top:10px;z-index:6;display:none;gap:6px}
+  #hudbtns.on{display:flex}
+  #hudbtns button{width:42px;height:42px;padding:0;font-size:16px;border-radius:10px;
+    background:rgba(20,30,14,.7);border:1px solid #3a4a26;color:#c9d6b8}
+  #hudbtns button:hover{background:rgba(45,64,32,.9);color:#fff}
 
   .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:6px;background:radial-gradient(900px 600px at 50% 35%,#1a2b16 0%,#0b1008 55%,#07080a 100%);
@@ -135,6 +135,12 @@
 <body>
 <div id="wrap"><canvas id="c" width="960" height="600"></canvas></div>
 
+<div id="hudbtns">
+  <button id="btnPause" title="Пауза">II</button>
+  <button id="btnSound" title="Звук">♪</button>
+  <button id="btnFull" title="На весь экран">⛶</button>
+</div>
+
 <div id="menu" class="screen">
   <img class="logo" src="logo.png" alt="Гимназия имени Н.В. Пушкова">
   <h1>Crazy <em>Mountaine</em></h1>
@@ -184,16 +190,39 @@
 <div id="settings" class="screen hidden">
   <div class="panel" style="max-width:480px">
     <h2>Настройки</h2>
-    <p>Как управлять героем</p>
+    <p>Управление</p>
     <div class="btns" style="width:100%;margin-bottom:8px">
       <button id="btnModeManual" class="on">Ручной прицел</button>
       <button id="btnModeAuto">Автострельба по ближайшему</button>
+    </div>
+    <p>Экран</p>
+    <div class="btns" style="width:100%;margin-bottom:8px">
+      <button id="btnLayoutAuto" class="on">Вид: авто</button>
+      <button id="btnLayoutLand">Вид: горизонтальный</button>
+      <button id="btnLayoutPort">Вид: вертикальный</button>
+    </div>
+    <p>Звук <span id="volLabel">60%</span></p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input type="range" id="volRange" min="0" max="100" value="60" style="flex:1">
+      <button id="btnMute" class="small">Выкл</button>
     </div>
     <div class="btns" style="width:100%">
       <button id="btnTouchForce" class="small">Джойстик: авто</button>
       <button id="btnBackSettings">Назад</button>
     </div>
     <p id="modeHelp" style="margin:10px 0 0;font-size:12px"></p>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel" style="max-width:380px">
+    <h2>Пауза</h2>
+    <p>Игра остановлена</p>
+    <div class="btns" style="width:100%">
+      <button class="primary" id="btnResume">Продолжить</button>
+      <button id="btnPauseSettings">Настройки</button>
+      <button id="btnPauseMenu">В главное меню</button>
+    </div>
   </div>
 </div>
 
@@ -273,7 +302,8 @@
 (() => {
 "use strict";
 
-const W = 960, H = 600, TS = 48;
+let W = 960, H = 600;
+const TS = 48;
 const cvs = document.getElementById('c');
 const ctx = cvs.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -282,14 +312,136 @@ const show = id => $(id).classList.remove('hidden');
 const hide = id => $(id).classList.add('hidden');
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
 
+// ================= ЭКРАН / ВЁРСТКА =================
+let layoutMode = 'auto';           // auto | landscape | portrait
+
+function applyLayout(){
+  let vertical;
+  if (layoutMode === 'portrait') vertical = true;
+  else if (layoutMode === 'landscape') vertical = false;
+  else vertical = innerHeight > innerWidth * 1.05;
+
+  W = vertical ? 600 : 960;
+  H = vertical ? 900 : 600;
+  cvs.width = W; cvs.height = H;
+  ctx.imageSmoothingEnabled = false;
+
+  const scale = Math.min(innerWidth / W, innerHeight / H);
+  cvs.style.width = Math.round(W*scale) + 'px';
+  cvs.style.height = Math.round(H*scale) + 'px';
+
+  if (P && map && state === 'play'){
+    cam.x = clamp(P.x - W/2, 0, Math.max(0, MAP_W*TS - W));
+    cam.y = clamp(P.y - H/2, 0, Math.max(0, MAP_H*TS - H));
+  }
+}
+addEventListener('resize', applyLayout);
+
+// ================= ЗВУК =================
+let actx = null, noiseBuf = null;
+function audio(){
+  if (!actx){
+    try {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      actx = new C();
+    } catch(e){ return null; }
+  }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function noise(){
+  const a = audio(); if (!a) return null;
+  if (!noiseBuf){
+    noiseBuf = a.createBuffer(1, a.sampleRate * 0.5, a.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+  }
+  const src = a.createBufferSource(); src.buffer = noiseBuf; return src;
+}
+function sfx(type){
+  if (meta.sound === 0) return;
+  const a = audio(); if (!a) return;
+  const vol = (meta.vol === undefined ? 60 : meta.vol) / 100;
+  if (vol <= 0) return;
+  const t = a.currentTime;
+  const master = a.createGain(); master.gain.value = vol * 0.35; master.connect(a.destination);
+
+  const tone = (freq, dur, wave, slideTo, delay) => {
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = wave || 'square';
+    o.frequency.setValueAtTime(freq, t + (delay||0));
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + (delay||0) + dur);
+    g.gain.setValueAtTime(0.0001, t + (delay||0));
+    g.gain.exponentialRampToValueAtTime(0.6, t + (delay||0) + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (delay||0) + dur);
+    o.connect(g); g.connect(master);
+    o.start(t + (delay||0)); o.stop(t + (delay||0) + dur + 0.02);
+  };
+  const burst = (dur, freq, q, delay) => {
+    const n = noise(); if (!n) return;
+    const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq; f.Q.value = q || 1;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.7, t + (delay||0));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (delay||0) + dur);
+    n.connect(f); f.connect(g); g.connect(master);
+    n.start(t + (delay||0)); n.stop(t + (delay||0) + dur + 0.02);
+  };
+
+  switch (type){
+    case 'shoot':  tone(680, .06, 'square', 240); break;
+    case 'hit':    burst(.06, 2200, 2); break;
+    case 'boom':   burst(.35, 700, 1); tone(90, .3, 'sawtooth', 40); break;
+    case 'hurt':   tone(180, .18, 'sawtooth', 70); break;
+    case 'kill':   tone(420, .1, 'triangle', 180); break;
+    case 'portal': tone(300, .5, 'sine', 900); tone(600, .5, 'sine', 1400, .1); break;
+    case 'drum':   for (let i = 0; i < 8; i++) tone(500 + i*60, .04, 'square', null, i*.07); tone(880, .25, 'sine', 1320, .6); break;
+    case 'levelup':tone(523, .12, 'sine'); tone(659, .12, 'sine', null, .12); tone(784, .2, 'sine', null, .24); break;
+    case 'click':  tone(900, .03, 'square'); break;
+    case 'lose':   tone(220, .5, 'sawtooth', 60); break;
+  }
+}
+
+// ================= ГЕЙМПАД =================
+let padFire = false, padPausePrev = false;
+function readPad(){
+  if (!navigator.getGamepads) return null;
+  const pads = navigator.getGamepads();
+  for (const g of pads){ if (g && g.connected) return g; }
+  return null;
+}
+function pollPad(){
+  const g = readPad();
+  if (!g){ padFire = false; return; }
+  const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
+  if (Math.hypot(ax, ay) > 0.22){ input.moveX = ax; input.moveY = ay; }
+  else if (input.moveX || input.moveY){ if (!pointers.size){ input.moveX = 0; input.moveY = 0; } }
+
+  const rx = g.axes[2] || 0, ry = g.axes[3] || 0;
+  if (Math.hypot(rx, ry) > 0.28){
+    input.aimActive = true;
+    input.aimX = rx; input.aimY = ry;
+  } else if (pointers.size === 0){
+    input.aimActive = false;
+  }
+
+  const fire = (g.buttons[7] && g.buttons[7].value > 0.3) || (g.buttons[0] && g.buttons[0].pressed);
+  padFire = !!fire;
+
+  const p = g.buttons[9] && g.buttons[9].pressed;
+  if (p && !padPausePrev) togglePause();
+  padPausePrev = !!p;
+}
+
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
   let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
   return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 // ================= МЕТА =================
 const META_KEY = 'crazy_mountaine_meta_v2';
-let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0};
+let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, vol:60, layout:'auto'};
 try { const raw = localStorage.getItem(META_KEY); if (raw) meta = Object.assign(meta, JSON.parse(raw)); } catch(e){}
+layoutMode = meta.layout || 'auto';
 function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e){} }
 const upLvl = id => meta.up[id] || 0;
 
@@ -626,6 +778,7 @@ let reelAnimating = false;
 let lastSpin = null;
 function openDrum(){
   state = 'drum';
+  sfx('drum');
   rerolls = 0;
   drumOpen = true;
   $('drumTitle').textContent = 'Барабан · уровень ' + plvl;
@@ -758,7 +911,7 @@ function aimAngle(){
   if (input.aimActive) return Math.atan2(input.aimY, input.aimX);
   return Math.atan2(mouse.y-P.y, mouse.x-P.x);
 }
-const wantFire = () => mode === 'auto' ? true : (input.fireHeld || mouse.down || keys.has(' '));
+const wantFire = () => mode === 'auto' ? true : (input.fireHeld || mouse.down || keys.has(' ') || padFire);
 
 function shoot(){
   const w = WEAPONS[P.weapon];
@@ -783,6 +936,7 @@ function shoot(){
     });
   }
   parts.push({x:P.x+Math.cos(base)*24, y:P.y+Math.sin(base)*24, life:.08, max:.08, kind:'muzzle'});
+  sfx('shoot');
   P.cool = w.delay * P.rateMul;
 }
 
@@ -796,7 +950,7 @@ addEventListener('keydown', e => {
   const dir = MOVE_CODES[e.code];
   if (dir) { keys.add(dir); e.preventDefault(); }
   if (e.code === 'Space'){ keys.add(' '); e.preventDefault(); }
-  if (e.code === 'Escape' && state === 'play'){ state='menu'; show('menu'); refreshMenu(); updateTouchVisibility(); }
+  if (e.code === 'Escape'){ if (state === 'play' || state === 'pause'){ e.preventDefault(); togglePause(); } }
 });
 addEventListener('keyup', e => {
   const dir = MOVE_CODES[e.code];
@@ -922,14 +1076,57 @@ function refreshRecords(){
 $('btnPlay').onclick = () => { hide('menu'); openPick(); };
 $('btnShop').onclick = () => { hide('menu'); refreshShop(); show('shop'); };
 $('btnRecords').onclick = () => { hide('menu'); refreshRecords(); show('records'); };
-$('btnSettings').onclick = () => { hide('menu'); show('settings'); };
+$('btnSettings').onclick = () => { hide('menu'); settingsFrom = 'menu'; syncSettings(); show('settings'); };
 $('btnDevs').onclick = () => { hide('menu'); show('devs'); };
 $('btnHelp').onclick = () => { hide('menu'); show('help'); };
 $('btnBack1').onclick = () => { hide('devs'); show('menu'); };
 $('btnBack2').onclick = () => { hide('help'); show('menu'); };
-$('btnBackSettings').onclick = () => { hide('settings'); show('menu'); refreshMenu(); };
+$('btnBackSettings').onclick = () => {
+  hide('settings');
+  if (settingsFrom === 'pause') show('pause'); else { show('menu'); refreshMenu(); }
+};
 $('btnShopBack').onclick = () => { hide('shop'); show('menu'); refreshMenu(); };
 $('btnRecordsBack').onclick = () => { hide('records'); show('menu'); refreshMenu(); };
+
+// ---------- пауза / HUD-кнопки / настройки ----------
+let settingsFrom = 'menu';
+function showHud(on){ $('hudbtns').classList.toggle('on', on); }
+function togglePause(){
+  if (state === 'play'){ state = 'pause'; sfx('click'); show('pause'); showHud(false); updateTouchVisibility(); }
+  else if (state === 'pause'){ state = 'play'; hide('pause'); showHud(true); updateTouchVisibility(); }
+}
+function syncSettings(){
+  $('btnModeManual').classList.toggle('on', mode === 'manual');
+  $('btnModeAuto').classList.toggle('on', mode === 'auto');
+  $('btnLayoutAuto').classList.toggle('on', layoutMode === 'auto');
+  $('btnLayoutLand').classList.toggle('on', layoutMode === 'landscape');
+  $('btnLayoutPort').classList.toggle('on', layoutMode === 'portrait');
+  $('volRange').value = meta.vol === undefined ? 60 : meta.vol;
+  $('volLabel').textContent = (meta.vol === undefined ? 60 : meta.vol) + '%';
+  $('btnMute').textContent = meta.sound === 0 ? 'Вкл' : 'Выкл';
+}
+$('btnPause').onclick = () => togglePause();
+$('btnSound').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; meta.vol = meta.vol || 60; saveMeta(); syncSettings(); sfx('click'); };
+$('btnFull').onclick = () => {
+  try {
+    if (!document.fullscreenElement) (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (()=>{})).call(document.documentElement);
+    else (document.exitFullscreen || document.webkitExitFullscreen || (()=>{})).call(document);
+  } catch(e){}
+};
+$('btnResume').onclick = () => togglePause();
+$('btnPauseMenu').onclick = () => { hide('pause'); show('menu'); state = 'menu'; refreshMenu(); showHud(false); updateTouchVisibility(); };
+$('btnPauseSettings').onclick = () => { settingsFrom = 'pause'; hide('pause'); syncSettings(); show('settings'); };
+$('volRange').oninput = e => {
+  meta.vol = +e.target.value; meta.sound = meta.vol > 0 ? 1 : 0;
+  $('volLabel').textContent = meta.vol + '%'; saveMeta(); syncSettings();
+};
+$('btnMute').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; saveMeta(); syncSettings(); };
+function setLayout(m){
+  layoutMode = m; meta.layout = m; saveMeta(); applyLayout(); syncSettings();
+}
+$('btnLayoutAuto').onclick = () => setLayout('auto');
+$('btnLayoutLand').onclick = () => setLayout('landscape');
+$('btnLayoutPort').onclick = () => setLayout('portrait');
 $('btnReset').onclick = () => {
   const spent = spentOnUpgrades();
   if (!spent) return;
@@ -977,6 +1174,7 @@ function startGame(){
   ['menu','shop','settings','devs','help','levelend','final','pick','records'].forEach(hide);
   state = 'play';
   startLevel(0);
+  showHud(true);
   updateTouchVisibility();
 }
 
@@ -1072,6 +1270,7 @@ function update(dt){
           moveWithCollision(en, Math.cos(a3)*P.knock*dt*4, Math.sin(a3)*P.knock*dt*4); }
         b.hit.add(en);
         parts.push({x:b.x,y:b.y,life:.16,max:.16,kind:'hit'});
+        sfx('hit');
         if (b.aoe) explode(b.x, b.y, b.dmg*.5, b.aoe);
         if (--b.pierce <= 0){ bullets.splice(i,1); gone = true; }
         break;
@@ -1152,6 +1351,7 @@ function update(dt){
   if (!portal && kills >= quota && !bossRef){
     const pos = randomFloorFar(300);
     portal = {x:pos.x, y:pos.y, t:0};
+    sfx('portal');
     toast = 'ОТКРЫЛСЯ ПОРТАЛ'; toastT = 3.5;
   } else if (!portal && kills >= quota && bossRef && toastT <= 0){
     toast = 'ДОБЕЙ БОССА'; toastT = 2.5;
@@ -1195,6 +1395,7 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
 }
 
 function hurtPlayer(dmg){
+  sfx('hurt');
   if (P.iframe > 0) return;
   if (P.shield > 0){ P.shield--; P.iframe = .4; parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'}); return; }
   P.hp -= dmg*(1-Math.min(.8,P.armor));
@@ -1203,6 +1404,7 @@ function hurtPlayer(dmg){
   if (P.hp <= 0) gameOver();
 }
 function explode(x,y,dmg,r){
+  sfx('boom');
   parts.push({x,y,life:.3,max:.3,kind:'boom',size:r});
   for (const en of enemies) if (Math.hypot(en.x-x, en.y-y) < r+en.r){ en.hp -= dmg; en.flash = .12; }
 }
@@ -1234,12 +1436,14 @@ function enterPortal(){
   $('nameBox').style.display = 'none';
   $('btnNext').textContent = (lvl+1 >= TOT) ? 'Финал' : ((lvl+1) % 5 === 0 ? 'Босс!' : 'Дальше');
   show('levelend');
+  showHud(false);
 }
 function nextLevel(){
   hide('levelend');
   if (lvl+1 >= TOT){ winGame(); return; }
   startLevel(lvl+1);
   state = 'play';
+  showHud(true);
   updateTouchVisibility();
 }
 function winGame(){
@@ -1247,14 +1451,14 @@ function winGame(){
   addGold(150); meta.best = TOT; saveMeta();
   $('finalStats').innerHTML = `<span>Убито: <b>${kills}</b></span><span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
   $('nameInput2').value = meta.lastName || '';
-  show('final'); state = 'win'; updateTouchVisibility();
+  show('final'); state = 'win'; showHud(false); updateTouchVisibility();
 }
 $('btnAgain').onclick = () => {
   saveRecord($('nameInput2').value || 'Безымянный');
   hide('final'); show('menu'); state = 'menu'; refreshMenu(); updateTouchVisibility();
 };
 function gameOver(){
-  state = 'over'; saveMeta();
+  state = 'over'; sfx('lose'); saveMeta();
   $('endTitle').textContent = 'Ты погиб';
   $('endSub').textContent = `Уровень ${lvl+1} из ${TOT} · ${LEVELS[lvl].biomeName}`;
   $('endStats').innerHTML = `<span>Убито: <b>${kills}</b></span><span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
@@ -1265,7 +1469,7 @@ function gameOver(){
     saveRecord($('nameInput').value || 'Безымянный');
     hide('levelend'); show('menu'); state = 'menu'; refreshMenu(); updateTouchVisibility();
   };
-  show('levelend'); updateTouchVisibility();
+  show('levelend'); showHud(false); updateTouchVisibility();
 }
 function saveRecord(name){
   meta.lastName = name;
@@ -1412,7 +1616,8 @@ function render(){
 }
 
 function drawHud(){
-  const bw = Math.min(280, W*.32), bh = 18, bx = 18, by = 16;
+  const fs1 = W < 700 ? 10 : 13, fs2 = W < 700 ? 9 : 11;
+  const bw = Math.min(280, W*.32), bh = W < 700 ? 14 : 18, bx = 18, by = 16;
   ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(bx-2,by-2,bw+4,bh+4);
   ctx.fillStyle='#3a1b1b'; ctx.fillRect(bx,by,bw,bh);
   const g = ctx.createLinearGradient(bx,0,bx+bw,0);
@@ -1420,10 +1625,10 @@ function drawHud(){
   ctx.fillStyle=g; ctx.fillRect(bx,by,bw*Math.max(0,P.hp/P.maxHp),bh);
   ctx.strokeStyle='#1c1414'; ctx.lineWidth=2; ctx.strokeRect(bx,by,bw,bh);
   if (IMG.heart) ctx.drawImage(IMG.heart, bx-34, by-4, 30, 30);
-  ctx.font='600 13px "Segoe UI", sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#e2e9ef';
+  ctx.font = '600 ' + fs1 + 'px "Segoe UI", sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#e2e9ef';
   ctx.fillText(`${Math.max(0,Math.ceil(P.hp))} / ${P.maxHp}`, bx+8, by+13);
   if (P.shield > 0){
-    ctx.fillStyle='#8ef0ff'; ctx.font='600 12px "Segoe UI", sans-serif';
+    ctx.fillStyle='#8ef0ff'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
     ctx.fillText('◌'.repeat(P.shield), bx+bw+10, by+13);
   }
   const L = LEVELS[lvl];
@@ -1437,7 +1642,7 @@ function drawHud(){
   if (toastT > 0 && toast){
     const a = Math.min(1, toastT);
     ctx.globalAlpha = a;
-    ctx.textAlign='center'; ctx.font='800 26px "Segoe UI", sans-serif';
+    ctx.textAlign='center'; ctx.font = '800 ' + (W<700?20:26) + 'px "Segoe UI", sans-serif';
     ctx.fillStyle = '#b6d43a';
     ctx.fillText(toast, W/2, 120);
     ctx.globalAlpha = 1;
@@ -1449,14 +1654,14 @@ function drawHud(){
     ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(x2-2,y2-2,w2+4,16);
     ctx.fillStyle='#3a1b1b'; ctx.fillRect(x2,y2,w2,12);
     ctx.fillStyle='#e8574a'; ctx.fillRect(x2,y2,w2*Math.max(0,bossRef.hp/bossRef.maxHp),12);
-    ctx.textAlign='center'; ctx.fillStyle='#e2e9ef'; ctx.font='600 11px "Segoe UI", sans-serif';
+    ctx.textAlign='center'; ctx.fillStyle='#e2e9ef'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
     ctx.fillText(bossRef.name, W/2, y2-6);
   }
 
   const xw = Math.min(520, W*.56), xh = 6, xx = (W-xw)/2, xy = H-16;
   ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(xx,xy,xw,xh);
   ctx.fillStyle='#b6d43a'; ctx.fillRect(xx,xy,xw*Math.min(1,xp/xpNeed),xh);
-  ctx.textAlign='center'; ctx.fillStyle='#7b8996'; ctx.font='600 11px "Segoe UI", sans-serif';
+  ctx.textAlign='center'; ctx.fillStyle='#7b8996'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
   ctx.fillText(`УРОВЕНЬ ГЕРОЯ ${plvl}`, W/2, xy-5);
   ctx.textAlign='left';
 }
@@ -1466,14 +1671,16 @@ let last = 0;
 function loop(now){
   const dt = Math.min((now-last)/1000 || 0, .05);
   last = now;
-  if (state === 'play') update(dt);
-  if (state === 'play' || state === 'levelend' || state === 'over' || state === 'win' ||
+  if (state === 'play'){ pollPad(); update(dt); }
+  if (state === 'play' || state === 'pause' || state === 'levelend' || state === 'over' || state === 'win' ||
       state === 'drum' || state === 'artifact') render();
   requestAnimationFrame(loop);
 }
 function boot(){
   resetGame();
+  applyLayout();
   setMode(useTouch ? 'auto' : 'manual');
+  syncSettings();
   refreshMenu();
   if (location.hash === '#play'){ meta.weapon='pistol'; startGame(); }
   if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
@@ -1484,7 +1691,7 @@ window.__game = {
   get P(){return P}, get enemies(){return enemies}, get bullets(){return bullets}, get state(){return state},
   get lvl(){return lvl}, get map(){return map}, get plvl(){return plvl}, get kills(){return kills},
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
-  get mode(){ return mode; },
+  get mode(){ return mode; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
