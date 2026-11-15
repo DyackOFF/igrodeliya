@@ -375,7 +375,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.10.1 (16.11)';
+const VERSION = 'v1.11.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -855,8 +855,9 @@ const ENEMY = {
   bat:    {hp:9,  speed:118, r:15, dmg:9,  xp:6,  spr:['bat0','bat1','bat2','bat3'], scale:38},
   spitter:{hp:22, speed:52,  r:18, dmg:10, xp:14, spr:['slime0','slime1'], scale:40, ranged:true},
   brute:  {hp:120,speed:48,  r:32, dmg:22, xp:32, spr:['slime0','slime1'], scale:82},
-  splitter: {hp:32, speed:74, r:22, dmg:14, xp:14, color:'#6fbf3a', scale:50, splits:true},
-  minisplit:{hp:10, speed:120,r:13, dmg:8,  xp:4,  color:'#8fdf5a', scale:28, mini:true},
+  splitter: {hp:34, speed:74, r:22, dmg:14, xp:14, color:'#6fbf3a', scale:50, splits:true, splitInto:'splitter2'},
+  splitter2:{hp:18, speed:92, r:16, dmg:10, xp:7,  color:'#7fd04a', scale:36, splits:true, splitInto:'minisplit'},
+  minisplit:{hp:7,  speed:120,r:11, dmg:6,  xp:3,  color:'#9ae06a', scale:24, mini:true},
   spider:   {hp:20, speed:88, r:18, dmg:10, xp:12, color:'#8a6bff', scale:42, web:true},
   skull:    {hp:12, speed:132,r:16, dmg:30, xp:10, color:'#e2e9ef', scale:34, kamikaze:true},
   skeleton: {hp:32, speed:70, r:20, dmg:14, xp:16, color:'#ded7c4', scale:46, revive:true}
@@ -1833,10 +1834,10 @@ function update(dt){
         sfx('poison');
       }
       const def = ENEMY[en.type] || {};
-      if (def.splits){
-        for (let sp2 = 0; sp2 < 2; sp2++){
+      if (def.splits && def.splitInto){
+        for (let sp2 = 0; sp2 < 3; sp2++){
           const a2 = Math.random()*6.28;
-          spawnEnemy('minisplit', {x:en.x + Math.cos(a2)*22, y:en.y + Math.sin(a2)*22});
+          spawnEnemy(def.splitInto, {x:en.x + Math.cos(a2)*22, y:en.y + Math.sin(a2)*22});
         }
       }
       if (def.revive){
