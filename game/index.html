@@ -81,6 +81,18 @@
   .slot p{margin:2px 0 0;font-size:9.5px;color:#8d99a5;line-height:1.25}
   .resTitle{font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 2px}
   .resDesc{color:#b9c4ce;font-size:12.5px;margin:0 0 10px}
+  @keyframes popIn{
+    0%{transform:scale(.45);opacity:0;filter:blur(4px)}
+    55%{transform:scale(1.14);opacity:1;filter:blur(0)}
+    100%{transform:scale(1);opacity:1}
+  }
+  #drumResult{opacity:0;transition:opacity .18s}
+  #drumResult.show{opacity:1}
+  #drumResult.pop{animation:popIn .55s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes flashFx{0%{opacity:0}25%{opacity:.55}100%{opacity:0}}
+  #drumFlash{position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 52%,rgba(255,255,255,.9),transparent 62%)}
+  #drumFlash.play{animation:flashFx .6s ease-out}
   .rollBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
   #touch{position:fixed;inset:0;z-index:4;display:none;pointer-events:none}
@@ -201,7 +213,7 @@
   <div class="panel" style="max-width:700px">
     <h2 id="drumTitle">Барабан</h2>
     <p id="drumSub">Крути и забирай</p>
-    <div class="reelWrap"><div class="strip" id="strip"></div></div>
+    <div class="reelWrap"><div class="strip" id="strip"></div><div id="drumFlash"></div></div>
     <div id="drumResult">
       <div class="resTitle" id="resName">—</div>
       <div class="resDesc" id="resDesc"></div>
@@ -587,6 +599,7 @@ function rollItem(){
 }
 
 let reelAnimating = false;
+let lastSpin = null;
 function openDrum(){
   state = 'drum';
   rerolls = 0;
@@ -608,10 +621,13 @@ function spinReel(){
 
   drumItem = rollItem();
   const strip = $('strip');
+  const rank = drumItem.kind === 'artifact' ? 3 : (drumItem.data.r === 'epic' ? 2 : drumItem.data.r === 'rare' ? 1 : 0);
+  const dur = [1400, 1850, 2350, 2900][rank];
+  const FINAL_IDX = 12 + rank * 2;
+  lastSpin = {rank, dur, idx: FINAL_IDX};
   strip.style.transition = 'none';
   strip.style.transform = 'translateX(0)';
   const cards = [];
-  const FINAL_IDX = 16;
   for (let i = 0; i < 24; i++){
     if (i === FINAL_IDX) cards.push(drumItem);
     else {
@@ -637,7 +653,7 @@ function spinReel(){
   const target = -(FINAL_IDX*cardW) + center;
 
   requestAnimationFrame(() => {
-    strip.style.transition = 'transform 1.9s cubic-bezier(.12,.72,.18,1)';
+    strip.style.transition = `transform ${dur}ms cubic-bezier(.1,.74,.15,1)`;
     strip.style.transform = `translateX(${target}px)`;
   });
 
@@ -645,14 +661,26 @@ function spinReel(){
     reelAnimating = false;
     const d = drumItem.data;
     const isArt = drumItem.kind === 'artifact';
+
+    const res = $('drumResult');
+    res.classList.remove('show','pop');
+    void res.offsetWidth;
+    res.classList.add('show','pop');
+
+    const fl = $('drumFlash');
+    fl.classList.remove('play');
+    void fl.offsetWidth;
+    fl.classList.add('play');
+
     $('resName').textContent = d.name + (isArt ? ' · артефакт' : '');
-    $('resName').style.color = isArt ? 'var(--c-art)' : (d.r==='epic'?'var(--c-epic)':d.r==='rare'?'var(--c-rare)':'var(--c-common)');
+    const col = isArt ? 'var(--c-art)' : (d.r === 'epic' ? 'var(--c-epic)' : d.r === 'rare' ? 'var(--c-rare)' : 'var(--c-common)');
+    $('resName').style.color = col;
+    $('resName').style.textShadow = rank >= 2 ? `0 0 22px ${col}` : 'none';
     $('resDesc').textContent = d.desc || '';
     $('btnTake').disabled = false;
-    const canRoll = meta.gold >= rerollCost();
-    $('btnReroll').disabled = !canRoll;
+    $('btnReroll').disabled = meta.gold < rerollCost();
     $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
-  }, 1950);
+  }, dur + 90);
 }
 
 $('btnTake').onclick = () => {
@@ -1377,6 +1405,7 @@ window.__game = {
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
   startGame, startLevel, update, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
+  get lastSpin(){ return lastSpin; },
   keyDown(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.add(dir); },
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
