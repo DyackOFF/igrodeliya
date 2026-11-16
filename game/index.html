@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.26.0 (16.11)';
+const VERSION = 'v1.26.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1665,8 +1665,11 @@ function refreshShop(){
     row.className = 'row';
     row.innerHTML = `<div class="nm" style="display:flex;align-items:center;gap:8px">
       <img class="ico" src="icons/${id}.png" alt="" style="margin:0;width:22px;height:22px" onerror="this.style.display='none'">
-      <span><b>${w.name}</b><small>${w.note}</small><small>${owned?'открыто':prev?'цена '+w.price+' зол.':'нужно купить '+WEAPONS[WEAPON_ORDER[i-1]].name}</small></span></div>
-      <div><button class="small" ${owned||!prev||meta.gold<w.price?'disabled':''}>${owned?'ЕСТЬ':prev?'Купить':'ЗАКРЫТО'}</button></div>`;
+      <span><b>${w.name}</b><small>${w.note}</small>${owned?'<small>открыто</small>':prev?'':`<small>нужно купить ${WEAPONS[WEAPON_ORDER[i-1]].name}</small>`}</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${owned?'':`<b style="color:${prev?'#ffb340':'#7b8996'};font-size:14px;white-space:nowrap">${w.price} зол.</b>`}
+        <button class="small" ${owned||!prev||meta.gold<w.price?'disabled':''}>${owned?'ЕСТЬ':prev?'Купить':'ЗАКРЫТО'}</button>
+      </div>`;
     if (!owned && prev) row.querySelector('button').onclick = () => {
       if (meta.gold < w.price) return;
       meta.gold -= w.price; meta.unlocked[id] = true; saveMeta(); refreshShop(); refreshMenu();
