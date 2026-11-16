@@ -135,17 +135,13 @@
   .stick.on{opacity:1}
   .knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
     background:radial-gradient(circle at 40% 35%,#d3ea6a,#7f9a1f);box-shadow:0 4px 16px rgba(0,0,0,.5)}
-  #fireBtn{position:absolute;right:0;top:50%;transform:translateY(-50%);
-    width:128px;height:128px;border-radius:64px 0 0 64px;
-    border:2px solid rgba(255,179,64,.65);border-right:none;
-    background:rgba(120,70,10,.38);color:#ffd28a;
-    font-weight:800;font-size:15px;letter-spacing:.06em;pointer-events:auto;display:none}
-  #fireBtn.on{display:block}
   .ring{position:absolute;bottom:10%;width:124px;height:124px;border-radius:50%;transform:translateX(-50%);
     border:2px dashed rgba(182,212,58,.22);pointer-events:none}
   .ring small{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);
     font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#4d5a44;white-space:nowrap}
   #ringMove{left:26%}
+  #touch.solo #ringMove{left:50%}
+  #touch.solo #ringAim{display:none}
   #ringAim{left:74%;border-color:rgba(255,179,64,.20)}
   #ringAim.off{display:none}
 
@@ -388,7 +384,6 @@
   <div class="ring" id="ringAim"><small>прицел</small></div>
   <div class="stick" id="stickMove"><div class="knob" id="knobMove"></div></div>
   <div class="stick" id="stickAim"><div class="knob" id="knobAim"></div></div>
-  <button id="fireBtn">ОГОНЬ</button>
 </div>
 <div class="hintbar" id="hintbar"></div>
 
@@ -396,7 +391,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.23.2 (16.11)';
+const VERSION = 'v1.24.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1508,29 +1503,29 @@ addEventListener('mouseup', () => mouse.down = false);
 
 const stickMove = $('stickMove'), knobMove = $('knobMove');
 const stickAim = $('stickAim'), knobAim = $('knobAim');
-const fireBtn = $('fireBtn');
 const pointers = new Map();
 const R = 58;
 const isTouchUI = () => forceTouch === null ? useTouch : forceTouch;
 
 function updateTouchVisibility(){
   const on = isTouchUI() && state === 'play';
+  const solo = mode === 'auto';
   $('touch').classList.toggle('on', on);
-  fireBtn.classList.toggle('on', on && mode === 'manual');
-  $('ringAim').classList.toggle('off', mode === 'auto');
+  $('touch').classList.toggle('solo', solo);
+  $('ringAim').classList.toggle('off', solo);
   $('hintbar').textContent = isTouchUI()
-    ? (mode === 'auto' ? 'левая половина — движение · стрельба автоматическая' : 'левая половина — движение · правая — прицел')
-    : (mode === 'auto' ? 'WASD — движение · стрельба автоматическая' : 'WASD — движение · мышь — прицел · ЛКМ — стрельба');
+    ? (solo ? 'весь экран — движение · стрельба автоматическая' : 'левая — движение · правая — прицел и огонь')
+    : (solo ? 'WASD — движение · стрельба автоматическая' : 'WASD — движение · мышь — прицел · ЛКМ — стрельба');
 }
 
 addEventListener('pointerdown', e => {
   if (state !== 'play' || !isTouchUI()) return;
-  if (e.target === fireBtn){ input.fireHeld = true; e.preventDefault(); return; }
   if (e.target.closest && e.target.closest('.screen')) return;
-  const left = e.clientX < innerWidth*0.5;
+  const left = mode === 'auto' || e.clientX < innerWidth*0.5;
   pointers.set(e.pointerId, {side:left?'move':'aim', ox:e.clientX, oy:e.clientY});
   const el = left?stickMove:stickAim;
   el.style.left = e.clientX+'px'; el.style.top = e.clientY+'px'; el.classList.add('on');
+  if (!left){ input.fireHeld = true; input.aimActive = true; }
   e.preventDefault();
 }, {passive:false});
 addEventListener('pointermove', e => {
@@ -1540,7 +1535,7 @@ addEventListener('pointermove', e => {
   (p.side==='move'?knobMove:knobAim).style.transform = `translate(${dx*k}px,${dy*k}px)`;
   const ux = dx/(d||1), uy = dy/(d||1);
   if (p.side === 'move'){ const m = Math.min(1, d/(R*.7)); input.moveX = ux*m; input.moveY = uy*m; }
-  else { input.aimActive = d > 8; input.aimX = ux; input.aimY = uy; input.fireHeld = d > 12; }
+  else if (d > 6){ input.aimActive = true; input.aimX = ux; input.aimY = uy; }
   e.preventDefault();
 }, {passive:false});
 function endPointer(e){
@@ -1551,9 +1546,6 @@ function endPointer(e){
 }
 addEventListener('pointerup', endPointer);
 addEventListener('pointercancel', endPointer);
-fireBtn.addEventListener('pointerdown', e => { input.fireHeld = true; e.preventDefault(); });
-fireBtn.addEventListener('pointerup', () => input.fireHeld = false);
-fireBtn.addEventListener('pointerleave', () => input.fireHeld = false);
 
 // ================= МЕНЮ =================
 // ---------- клавиатурная навигация по меню ----------
