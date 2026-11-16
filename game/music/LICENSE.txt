@@ -2,12 +2,17 @@
 Лицензия: Creative Commons Attribution 4.0 (CC BY 4.0)
 https://creativecommons.org/licenses/by/4.0/
 
-Требуется указание автора (оно есть в игре: экран «Разработчики» и этот файл).
+Требуется указание автора — оно есть в игре (экран «Разработчики») и в этом файле.
 
 Треки:
-- menu.mp3    — "Gathering Darkness" — Kevin MacLeod (incompetech.com), CC BY 4.0
-- combat1.mp3 — "Killers" — Kevin MacLeod (incompetech.com), CC BY 4.0
-- combat2.mp3 — "Volatile Reaction" — Kevin MacLeod (incompetech.com), CC BY 4.0
-- boss.mp3    — "Five Armies" — Kevin MacLeod (incompetech.com), CC BY 4.0
+- menu.mp3    — "Gathering Darkness"
+- calm.mp3    — "Ice Flow"
+- combat1.mp3 — "Killers"
+- combat2.mp3 — "Volatile Reaction"
+- combat3.mp3 — "Curse of the Scarab"
+- combat4.mp3 — "Movement Proposition"
+- boss.mp3    — "Five Armies"
+- boss2.mp3   — "Anxiety"
 
+Все — Kevin MacLeod (incompetech.com), лицензия CC BY 4.0.
 Файлы перекодированы в mp3 112 kbps для веба.

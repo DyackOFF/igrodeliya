@@ -381,7 +381,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.16.0 (16.11)';
+const VERSION = 'v1.17.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -747,33 +747,41 @@ function setMusicTrack(i){
 // ---- музыкальные треки (CC BY, Kevin MacLeod / incompetech.com) ----
 const MUSIC_FILES = {
   menu:    'music/menu.mp3',
+  calm:    'music/calm.mp3',
   combat1: 'music/combat1.mp3',
   combat2: 'music/combat2.mp3',
-  boss:    'music/boss.mp3'
+  combat3: 'music/combat3.mp3',
+  combat4: 'music/combat4.mp3',
+  boss:    'music/boss.mp3',
+  boss2:   'music/boss2.mp3'
 };
 const MUSIC_BUF = {};
-let musicSrc = null, musicTrackName = null, musicGain = null, musicLoading = false;
+let musicSrc = null, musicTrackName = null, musicGain = null;
+const MUSIC_PENDING = {};
 
 function loadMusicTracks(){
-  if (musicLoading || typeof fetch !== 'function') return;
-  musicLoading = true;
-  const a = audio(); if (!a) return;
-  Object.entries(MUSIC_FILES).forEach(([k, url]) => {
-    fetch(url).then(r => r.arrayBuffer())
-      .then(b => new Promise(res => a.decodeAudioData(b, buf => res(buf), () => res(null))))
-      .then(buf => {
-        if (!buf) return;
-        MUSIC_BUF[k] = buf;
-        if (!musicSrc) playTrackForMode();
-      })
-      .catch(() => {});
-  });
+  ensureTrack(trackForMode());
+}
+function ensureTrack(name){
+  if (MUSIC_BUF[name] || MUSIC_PENDING[name]) return;
+  if (typeof fetch !== 'function') return;
+  const a = audio(); if (!a || !MUSIC_FILES[name]) return;
+  MUSIC_PENDING[name] = true;
+  fetch(MUSIC_FILES[name]).then(r => r.arrayBuffer())
+    .then(b => new Promise(res => a.decodeAudioData(b, buf => res(buf), () => res(null))))
+    .then(buf => {
+      delete MUSIC_PENDING[name];
+      if (!buf) return;
+      MUSIC_BUF[name] = buf;
+      if (trackForMode() === name) playTrackForMode();
+    })
+    .catch(() => { delete MUSIC_PENDING[name]; });
 }
 function trackForMode(){
   if (MUSIC.mode === 'menu') return 'menu';
-  if (MUSIC.mode === 'boss') return 'boss';
-  if (MUSIC.mode === 'calm') return 'menu';
-  return (MUSIC.style % 2) ? 'combat2' : 'combat1';
+  if (MUSIC.mode === 'calm') return 'calm';
+  if (MUSIC.mode === 'boss') return (MUSIC.style % 2) ? 'boss2' : 'boss';
+  return 'combat' + (1 + (MUSIC.style % 4));
 }
 function stopMusicTrack(){
   if (musicSrc){ try { musicSrc.stop(); } catch(e){} }
@@ -785,7 +793,7 @@ function playTrackForMode(){
   if (vol <= 0){ stopMusicTrack(); return; }
   const name = trackForMode();
   const buf = MUSIC_BUF[name];
-  if (!buf){ return; }               // ещё не загрузилось — играет процедурка
+  if (!buf){ ensureTrack(name); return; }    // ещё не загрузилось — пока играет процедурка
   if (musicTrackName === name && musicSrc) return;
   stopMusicTrack();
   const src = a.createBufferSource();
