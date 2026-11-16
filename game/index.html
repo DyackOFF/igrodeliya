@@ -117,6 +117,15 @@
   #drumFlash{position:absolute;inset:0;pointer-events:none;opacity:0;
     background:radial-gradient(circle at 50% 52%,rgba(255,255,255,.9),transparent 62%)}
   #drumFlash.play{animation:flashFx .6s ease-out}
+  /* падающие лица на экране «Разработчики» */
+  .devfaces{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
+  .devfaces img{position:absolute;top:-24%;height:auto;animation:devfall linear infinite;
+    filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));will-change:transform}
+  @keyframes devfall{
+    0%{transform:translate3d(0,-12vh,0) rotate(0deg)}
+    100%{transform:translate3d(var(--drift,0px),118vh,0) rotate(var(--rot,15deg))}
+  }
+  @media (prefers-reduced-motion: reduce){ .devfaces{display:none} }
   .rollBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
   #touch{position:fixed;inset:0;z-index:4;display:none;pointer-events:none}
@@ -300,6 +309,7 @@
 </div>
 
 <div id="devs" class="screen hidden">
+  <div id="devFaces" class="devfaces" aria-hidden="true"></div>
   <div class="panel" style="max-width:560px">
     <h2>Разработчики</h2>
     <p>ИГРОДЕЛИЯ · 2026</p>
@@ -386,7 +396,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.22.0 (16.11)';
+const VERSION = 'v1.23.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1691,7 +1701,23 @@ $('btnPlay').onclick = () => { hide('menu'); openPick(); };
 $('btnShop').onclick = () => { hide('menu'); refreshShop(); show('shop'); };
 $('btnRecords').onclick = () => { hide('menu'); refreshRecords(); show('records'); };
 $('btnSettings').onclick = () => { hide('menu'); settingsFrom = 'menu'; syncSettings(); show('settings'); };
-$('logoBtn').onclick = () => { sfx('click'); hide('menu'); show('devs'); };
+const DEV_FACES = ['assets/devs/face1.png','assets/devs/face2.png','assets/devs/face3.png','assets/devs/face4.png','assets/devs/face5.png'];
+function spawnDevFaces(){
+  const box = $('devFaces'); if (!box) return;
+  box.innerHTML = '';
+  for (let i = 0; i < 14; i++){
+    const im = new Image();
+    im.src = DEV_FACES[i % DEV_FACES.length];
+    im.alt = '';
+    const w = 46 + Math.random()*86;
+    im.style.cssText = `width:${w|0}px;left:${(Math.random()*100).toFixed(1)}%;` +
+      `animation-duration:${(10 + Math.random()*11).toFixed(1)}s;animation-delay:-${(Math.random()*21).toFixed(1)}s;` +
+      `--drift:${((Math.random()*2-1)*90)|0}px;--rot:${((Math.random()*2-1)*40)|0}deg;` +
+      `opacity:${(0.22 + Math.random()*0.3).toFixed(2)}`;
+    box.appendChild(im);
+  }
+}
+$('logoBtn').onclick = () => { sfx('click'); hide('menu'); spawnDevFaces(); show('devs'); };
 $('btnHelp').onclick = () => { hide('menu'); show('help'); };
 $('btnBack1').onclick = () => { hide('devs'); show('menu'); };
 $('btnBack2').onclick = () => { hide('help'); show('menu'); };
