@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.25.1 (16.11)';
+const VERSION = 'v1.25.2 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1054,7 +1054,7 @@ const ITEMS = [
   {id:'dmg',    r:'common', ic:'✦', name:'Урон',              desc:'+30% к урону', max:8, apply:p=>p.dmgMul*=1.3},
   {id:'speed',  r:'common', ic:'»', name:'Ботинки',           desc:'+10% к скорости', max:6, apply:p=>p.speed*=1.1},
   {id:'hp',     r:'common', ic:'♥', name:'Сердце',            desc:'+25 HP и лечение', max:6, apply:p=>{p.maxHp+=25;p.hp=Math.min(p.maxHp,p.hp+25);}},
-  {id:'pierce', r:'common', ic:'➤', name:'Пробивание',        desc:'Пуля пробивает +1 врага насквозь', max:4, apply:p=>p.pierce++},
+  {id:'pierce', r:'common', ic:'➤', name:'Пробивание',        desc:'Пуля пробивает +1 врага, но теряет 30% урона за пробитым', max:4, apply:p=>p.pierce++},
   {id:'crit',   r:'rare',   ic:'✷', name:'Критический удар',  desc:'+15% шанс урона x2.5', max:5, apply:p=>p.crit+=.15},
   {id:'armor',  r:'rare',   ic:'⛊', name:'Броня',             desc:'-15% получаемого урона', max:4, apply:p=>p.armor+=.15},
   {id:'magnet', r:'rare',   ic:'◎', name:'Магнит опыта',      desc:'+40% опыта', max:4, apply:p=>p.xpMul+=.4},
@@ -2077,7 +2077,7 @@ function update(dt){
           parts.push({x:g.x, y:g.y, life:.4, max:.4, kind:'death', size:50});
           sfx('kill');
         }
-        if (b.pierce > 0) b.pierce--; else { bullets.splice(i,1); gone = true; }
+        if (b.pierce > 0){ b.pierce--; b.dmg *= 0.7; } else { bullets.splice(i,1); gone = true; }
         break;
       }
     }
@@ -2088,7 +2088,7 @@ function update(dt){
         if (en.cocoon){
           parts.push({x:b.x,y:b.y,life:.12,max:.12,kind:'hit'});
           b.hit.add(en);
-          if (b.pierce > 0) b.pierce--; else { bullets.splice(i,1); gone = true; }
+          if (b.pierce > 0){ b.pierce--; b.dmg *= 0.7; } else { bullets.splice(i,1); gone = true; }
           break;
         }
         en.hp -= b.dmg; en.flash = .12;
@@ -2117,7 +2117,7 @@ function update(dt){
         parts.push({x:b.x,y:b.y,life:.16,max:.16,kind:'hit'});
         sfx('hit');
         if (b.aoe) explode(b.x, b.y, b.dmg*.5, b.aoe);
-        if (b.pierce > 0) b.pierce--; else { bullets.splice(i,1); gone = true; }
+        if (b.pierce > 0){ b.pierce--; b.dmg *= 0.7; } else { bullets.splice(i,1); gone = true; }
         break;
       }
     }
