@@ -383,7 +383,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.19.0 (16.11)';
+const VERSION = 'v1.19.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -2822,9 +2822,7 @@ function drawHud(){
   ctx.textAlign='right'; ctx.fillStyle='#9fb0be';
   ctx.fillText(tutorial ? 'Обучение' : `Уровень ${lvl+1}/${TOT} · ${L.biomeName}`, W-18, 30);
   ctx.fillStyle='#b6d43a';
-  const magSize = magCapacity();
-  const ammoTxt = magSize > 0 ? (P.reloadT > 0 ? 'перезарядка…' : P.ammo + '/' + magSize) : '∞';
-  ctx.fillText(`${WEAPONS[P.weapon].name} · ${ammoTxt} · ${bossRef ? 'УБЕЙ БОССА' : 'убито ' + Math.min(kills,quota) + '/' + quota}`, W-18, 49);
+  ctx.fillText(bossRef ? 'УБЕЙ БОССА' : 'убито ' + Math.min(kills,quota) + '/' + quota, W-18, 49);
   ctx.fillStyle='#ffb340';
   ctx.fillText(`${L.mod.name} · золото ${meta.gold}`, W-18, 68);
 
