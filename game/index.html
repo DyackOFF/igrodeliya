@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.27.0 (16.11)';
+const VERSION = 'v1.27.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -579,10 +579,12 @@ function sfx(type){
     case 'kill':   tone(420, .1, 'triangle', 180, 0, .3); break;
     case 'portal': tone(300, .5, 'sine', 900, 0, .3); tone(600, .5, 'sine', 1400, .1, .25); break;
     case 'drum': {
-      // завод барабана: щелчки трещотки + низкий «вум»
-      for (let i = 0; i < 12; i++) tone(700 + i*80, .03, 'square', null, i*.045, .1);
-      burst(.14, 3200, 1, 0);
-      tone(170, .22, 'sawtooth', 80, 0, .2);
+      // новый уровень + старт прокрута: удар, трещотка и короткая фанфара
+      tone(190, .32, 'sawtooth', 70, 0, .6);
+      burst(.18, 4000, 1, 0);
+      for (let i = 0; i < 14; i++) tone(760 + i*70, .05, 'square', null, .02 + i*.05, .5);
+      chord([523, 784, 1047], .4, 'sawtooth', .34, .45);
+      tone(1568, .4, 'sine', 2093, .36, .3);
       break;
     }
     case 'roll_common':
@@ -612,7 +614,11 @@ function sfx(type){
       chord([784, 1047, 1319], .3, 'triangle', 0, .34);
       tone(1568, .4, 'sine', 2093, .12, .2);
       break;
-    case 'levelup':tone(523, .12, 'sine'); tone(659, .12, 'sine', null, .12); tone(784, .2, 'sine', null, .24); break;
+    case 'levelup':
+      chord([523, 659, 784], .16, 'sawtooth', 0, .5);
+      chord([659, 784, 1047], .22, 'sawtooth', .14, .5);
+      chord([784, 1047, 1319], .5, 'triangle', .3, .5);
+      break;
     case 'reload':  tone(300, .06, 'square'); tone(420, .08, 'square', null, .12, .3); break;
     case 'click':  tone(900, .03, 'square'); break;
     case 'tp':     tone(500, .22, 'sine', 1200); break;
