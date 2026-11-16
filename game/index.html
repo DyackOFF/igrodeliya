@@ -383,7 +383,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.19.1 (16.11)';
+const VERSION = 'v1.20.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1054,7 +1054,8 @@ const ARTIFACTS = [
   {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+5 HP за убийство',       apply:p=>p.vamp+=5},
   {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+2 орбитальных шара',     apply:p=>p.orbs+=2},
   {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Оставляешь за собой ядовитый шлейф', apply:p=>p.gasTrail=true},
-  {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка вдвое быстрее',  apply:p=>p.reloadMul*=0.5}
+  {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка вдвое быстрее',  apply:p=>p.reloadMul*=0.5},
+  {id:'a_reroll',ic:'⏳', name:'Часы перемотки', desc:'Все прошлые барабаны крутятся заново', ultra:true, apply:p=>{p.rerollLeft = plvl;}}
 ];
 
 // ================= ВРАГИ =================
@@ -1087,7 +1088,7 @@ function resetGame(){
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
        shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
-       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1};
+       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
   P.ammo = magCapacity();
@@ -1243,7 +1244,13 @@ function rollItem(){
     const r = rollRarity();
     if (r === 'artifact'){
       const arts = eligibleArtifacts();
-      if (arts.length) return {kind:'artifact', data: arts[Math.floor(Math.random()*arts.length)]};
+      if (arts.length){
+        const ultra = arts.filter(a => a.ultra);
+        const normal = arts.filter(a => !a.ultra);
+        if (ultra.length && Math.random() < 0.05) return {kind:'artifact', data: ultra[0]};
+        const pool2 = normal.length ? normal : arts;
+        return {kind:'artifact', data: pool2[Math.floor(Math.random()*pool2.length)]};
+      }
     } else {
       const pool = eligibleItems().filter(i => i.r === r);
       if (pool.length) return {kind:'item', data: pool[Math.floor(Math.random()*pool.length)]};
@@ -1373,7 +1380,14 @@ $('btnTake').onclick = () => {
     stacks[drumItem.data.id] = (stacks[drumItem.data.id]||0) + 1;
     drumItem.data.apply(P);
   }
-  drumItem = null; drumOpen = false;
+  drumItem = null;
+  // «Часы перемотки»: крутим заново все барабаны, что были до этого
+  if (P.rerollLeft > 0){
+    P.rerollLeft--;
+    spinReel();
+    return;
+  }
+  drumOpen = false;
   hide('drum'); state = 'play'; showHud(true);
 };
 $('btnReroll').onclick = () => {
