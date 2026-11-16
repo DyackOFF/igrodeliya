@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.26.1 (16.11)';
+const VERSION = 'v1.26.2 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -2834,20 +2834,60 @@ function render(){
     ctx.fillStyle = 'rgba(255,179,64,.9)';
     ctx.beginPath(); ctx.arc(tx, ty, 2, 0, 6.3); ctx.fill();
   }
-  // оружие в руках
-  {
-    const art = WEAPON_ART[P.weapon] || WEAPON_ART.pistol;
-    ctx.save();
-    ctx.translate(P.x-cam.x, P.y-cam.y);
-    ctx.rotate(P.aim);
-    ctx.fillStyle = art.color;
-    ctx.fillRect(5, -art.w/2, art.len, art.w);
-    ctx.fillStyle = 'rgba(0,0,0,.45)';
-    ctx.fillRect(5, art.w/2 - 1, art.len, 1);
-    ctx.fillRect(5, -art.w/2 - 3, 5, art.w + 6);
-    if (art.dual) ctx.fillRect(5, -art.w/2 - 7, art.len*0.75, art.w);
-    ctx.restore();
+// оружие в руках героя: у каждого свой силуэт
+function drawWeaponArt(id){
+  const a = WEAPON_ART[id] || WEAPON_ART.pistol;
+  const L = a.len, W = a.w, x0 = 5;
+  ctx.fillStyle = a.color;
+  ctx.fillRect(x0, -W/2, L, W);
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillRect(x0, W/2 - 1, L, 1);
+  ctx.fillRect(x0, -W/2 - 3, 5, W + 6);
+  switch(id){
+    case 'dual':
+      ctx.fillStyle = a.color; ctx.fillRect(x0, -W/2 - 7, L*0.8, W); break;
+    case 'smg':
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(9, W/2, 6, 9); break;
+    case 'shocker':
+      ctx.fillStyle = '#d8fbff';
+      for (let i = 0; i < 3; i++){ ctx.beginPath(); ctx.arc(8 + i*4, 0, 2.2, 0, 6.3); ctx.fill(); } break;
+    case 'shotgun':
+      ctx.fillStyle = '#8a6a3a'; ctx.fillRect(x0 + L - 2, -W/2, 6, W);
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(x0, -1, L, 1.4); break;
+    case 'minigun':
+      ctx.fillStyle = '#8d99a5'; ctx.beginPath(); ctx.arc(9, 0, W*0.9, 0, 6.3); ctx.fill();
+      ctx.fillStyle = '#e2e9ef'; ctx.beginPath(); ctx.arc(9, 0, W*0.35, 0, 6.3); ctx.fill(); break;
+    case 'sniper':
+      ctx.fillStyle = '#2b3a20'; ctx.fillRect(9, -W/2 - 4, 8, 3);
+      ctx.fillStyle = a.color; ctx.fillRect(x0 + L, -W/2, 4, W*1.6); break;
+    case 'rocket':
+      ctx.fillStyle = '#e2e9ef'; ctx.beginPath();
+      ctx.moveTo(x0 + L, 0); ctx.lineTo(x0 + L - 7, -W/2); ctx.lineTo(x0 + L - 7, W/2); ctx.fill(); break;
+    case 'grenade':
+      ctx.strokeStyle = '#5a4326'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x0 + L, 0, W*0.9, 0, 6.3); ctx.stroke(); break;
+    case 'plasma':
+      ctx.fillStyle = '#e6c6ff'; ctx.beginPath(); ctx.arc(x0 + L - 2, 0, W*0.75, 0, 6.3); ctx.fill(); break;
+    case 'cryo':
+      ctx.fillStyle = '#d8fbff'; ctx.beginPath();
+      ctx.moveTo(x0 + L, 0); ctx.lineTo(x0 + L - 8, -W/2); ctx.lineTo(x0 + L - 8, W/2); ctx.fill(); break;
+    case 'railgun':
+      ctx.strokeStyle = '#a6d3ff'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(6, -W/2 - 2); ctx.lineTo(x0 + L, -W/2 - 2);
+      ctx.moveTo(6, W/2 + 2); ctx.lineTo(x0 + L, W/2 + 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(74,163,255,.55)';
+      ctx.beginPath(); ctx.moveTo(x0 + L, 0); ctx.lineTo(x0 + L + 10, 0); ctx.stroke(); break;
+    case 'laser':
+      ctx.fillStyle = '#d8fbff'; ctx.beginPath(); ctx.arc(x0 + L, 0, W*0.6, 0, 6.3); ctx.fill(); break;
   }
+}
+  // оружие в руках
+  ctx.save();
+  ctx.translate(P.x-cam.x, P.y-cam.y);
+  ctx.rotate(P.aim);
+  drawWeaponArt(P.weapon);
+  ctx.restore();
 
   for (const p of parts){
     const px = p.x-cam.x, py = p.y-cam.y, k = p.life/p.max;
