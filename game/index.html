@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.27.2 (16.11)';
+const VERSION = 'v1.28.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -650,10 +650,11 @@ function stopMusic(){
   stopMusicTrack(true);
 }
 function setMusicMode(m){
-  if (MUSIC.mode === m) return;
+  const changed = MUSIC.mode !== m;
   MUSIC.mode = m;
   MUSIC.running = true;
-  duckMusic(false);
+  if (changed) duckMusic(false);
+  pickTrack();                 // каждый уровень/босс — новый случайный трек
   playTrackForMode();
 }
 function setMusicTrack(i){
@@ -667,15 +668,33 @@ function setMusicTrack(i){
 const MUSIC_FILES = {
   menu:    'music/menu.mp3',
   calm:    'music/calm.mp3',
+  calm2:   'music/calm2.mp3',
   combat1: 'music/combat1.mp3',
   combat2: 'music/combat2.mp3',
   combat3: 'music/combat3.mp3',
   combat4: 'music/combat4.mp3',
+  combat5: 'music/combat5.mp3',
+  combat6: 'music/combat6.mp3',
+  combat7: 'music/combat7.mp3',
+  combat8: 'music/combat8.mp3',
+  combat9: 'music/combat9.mp3',
+  combat10:'music/combat10.mp3',
+  combat11:'music/combat11.mp3',
+  combat12:'music/combat12.mp3',
   boss:    'music/boss.mp3',
-  boss2:   'music/boss2.mp3'
+  boss2:   'music/boss2.mp3',
+  boss3:   'music/boss3.mp3',
+  boss4:   'music/boss4.mp3'
+};
+// пулы треков: в бою и у боссов каждый раз новая случайная композиция
+const TRACK_SETS = {
+  menu: ['menu'],
+  calm: ['calm', 'calm2'],
+  combat: ['combat1','combat2','combat3','combat4','combat5','combat6','combat7','combat8','combat9','combat10','combat11','combat12'],
+  boss: ['boss','boss2','boss3','boss4']
 };
 const MUSIC_BUF = {};
-let musicSrc = null, musicTrackName = null, musicGain = null;
+let musicSrc = null, musicTrackName = null, musicGain = null, wantedTrack = 'menu';
 const MUSIC_PENDING = {};
 
 function loadMusicTracks(){
@@ -696,11 +715,15 @@ function ensureTrack(name){
     })
     .catch(() => { delete MUSIC_PENDING[name]; });
 }
+function pickTrack(){
+  const set = TRACK_SETS[MUSIC.mode] || TRACK_SETS.combat;
+  let pick = set[Math.floor(Math.random() * set.length)];
+  if (set.length > 1 && pick === wantedTrack) pick = set[(set.indexOf(pick) + 1) % set.length];
+  wantedTrack = pick;
+  return pick;
+}
 function trackForMode(){
-  if (MUSIC.mode === 'menu') return 'menu';
-  if (MUSIC.mode === 'calm') return 'calm';
-  if (MUSIC.mode === 'boss') return (MUSIC.style % 2) ? 'boss2' : 'boss';
-  return 'combat' + (1 + (MUSIC.style % 4));
+  return wantedTrack;
 }
 function stopMusicTrack(fade){
   if (!musicSrc){ return; }
@@ -3048,7 +3071,7 @@ window.__game = {
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
   get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get stacks(){ return stacks; }, get pendingSkel(){ return pendingSkel; }, get musicMode(){ return MUSIC.mode; },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
-  musicWatchdog, stopMusicTrack, get musicTrack(){ return musicTrackName; },
+  musicWatchdog, stopMusicTrack, get musicTrack(){ return musicTrackName; }, get wantTrack(){ return wantedTrack; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
