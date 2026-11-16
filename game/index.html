@@ -383,7 +383,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.20.0 (16.11)';
+const VERSION = 'v1.20.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1244,13 +1244,7 @@ function rollItem(){
     const r = rollRarity();
     if (r === 'artifact'){
       const arts = eligibleArtifacts();
-      if (arts.length){
-        const ultra = arts.filter(a => a.ultra);
-        const normal = arts.filter(a => !a.ultra);
-        if (ultra.length && Math.random() < 0.05) return {kind:'artifact', data: ultra[0]};
-        const pool2 = normal.length ? normal : arts;
-        return {kind:'artifact', data: pool2[Math.floor(Math.random()*pool2.length)]};
-      }
+      if (arts.length) return {kind:'artifact', data: arts[Math.floor(Math.random()*arts.length)]};
     } else {
       const pool = eligibleItems().filter(i => i.r === r);
       if (pool.length) return {kind:'item', data: pool[Math.floor(Math.random()*pool.length)]};
