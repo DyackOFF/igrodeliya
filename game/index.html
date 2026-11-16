@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.27.1 (16.11)';
+const VERSION = 'v1.27.2 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -653,6 +653,7 @@ function setMusicMode(m){
   if (MUSIC.mode === m) return;
   MUSIC.mode = m;
   MUSIC.running = true;
+  duckMusic(false);
   playTrackForMode();
 }
 function setMusicTrack(i){
@@ -730,7 +731,7 @@ function playTrackForMode(){
   const src = a.createBufferSource();
   src.buffer = buf; src.loop = true;
   const g = a.createGain();
-  const t = a.currentTime, target = vol * 0.55;
+  const t = a.currentTime, target = vol * 0.55 * musicDuck;
   g.gain.setValueAtTime(0.0001, t);
   g.gain.linearRampToValueAtTime(target, t + 0.5);
   src.connect(g); g.connect(a.destination);
@@ -747,8 +748,14 @@ function refreshMusicVolume(){
     const t = actx.currentTime;
     musicGain.gain.cancelScheduledValues(t);
     musicGain.gain.setValueAtTime(musicGain.gain.value, t);
-    musicGain.gain.linearRampToValueAtTime(musicVolume() * 0.55, t + 0.2);
+    musicGain.gain.linearRampToValueAtTime(musicVolume() * 0.55 * musicDuck, t + 0.2);
   }
+}
+// приглушение музыки (пауза), без перезапуска трека
+let musicDuck = 1;
+function duckMusic(on){
+  musicDuck = on ? 0.22 : 1;
+  refreshMusicVolume();
 }
 // сторож музыки: браузер может усыпить звук посреди боя и трек не вернётся сам
 function musicWatchdog(){
@@ -1706,8 +1713,8 @@ function refreshPause(){
   }
 }
 function togglePause(){
-  if (state === 'play'){ state = 'pause'; sfx('click'); stopMusic(); refreshPause(); show('pause'); showHud(false); updateTouchVisibility(); }
-  else if (state === 'pause'){ state = 'play'; hide('pause'); showHud(true); startMusic(); updateTouchVisibility(); }
+  if (state === 'play'){ state = 'pause'; sfx('click'); duckMusic(true); refreshPause(); show('pause'); showHud(false); updateTouchVisibility(); }
+  else if (state === 'pause'){ state = 'play'; hide('pause'); showHud(true); duckMusic(false); startMusic(); updateTouchVisibility(); }
 }
 function syncSettings(){
   $('btnModeManual').classList.toggle('on', mode === 'manual');
