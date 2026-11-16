@@ -381,7 +381,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.17.0 (16.11)';
+const VERSION = 'v1.18.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -984,6 +984,11 @@ const RELOAD = {
 };
 const magOf = id => (RELOAD[id] ? RELOAD[id][0] : 0);
 const reloadOf = id => (RELOAD[id] ? RELOAD[id][1] : 0);
+function magCapacity(){
+  const m = magOf(P.weapon);
+  if (m <= 0) return 0;
+  return Math.max(1, Math.round(m * (P.magMul || 1)));
+}
 
 const WEAPON_ART = {
   pistol:  {len:14, w:4, color:'#c9d3dd'},
@@ -1014,6 +1019,8 @@ const ITEMS = [
   {id:'regen',  r:'rare',   ic:'✚', name:'Регенерация',       desc:'+1 HP в секунду', max:4, apply:p=>p.regen+=1},
   {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+3 HP за убийство', max:3, apply:p=>p.vamp+=3},
   {id:'slow',   r:'rare',   ic:'❄', name:'Замедление',        desc:'Замедляет сильнее с каждым уровнем', max:2, apply:p=>p.slow+=1},
+  {id:'fastreload', r:'rare', ic:'⟳', name:'Быстрая перезарядка', desc:'−20% времени перезарядки', max:3, apply:p=>p.reloadMul*=0.8},
+  {id:'bigmag', r:'epic',   ic:'▭', name:'Расширенный магазин', desc:'+40% патронов в магазине', max:2, apply:p=>p.magMul*=1.4},
   {id:'poison', r:'rare',   ic:'☠', name:'Яд',                desc:'Сильнее и дольше с каждым уровнем, облако больше', max:3, apply:p=>p.poison+=1},
   {id:'multi',  r:'epic',   ic:'≡', name:'Раздвоение',        desc:'+1 пуля в залпе', max:4, apply:p=>p.extraShots++},
   {id:'thorns', r:'epic',   ic:'✸', name:'Шипы',              desc:'Враги получают урон в упор (+16 за уровень)', max:3, apply:p=>p.thorns+=16},
@@ -1038,7 +1045,8 @@ const ARTIFACTS = [
   {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+20% к скорости',         apply:p=>p.speed*=1.2},
   {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+5 HP за убийство',       apply:p=>p.vamp+=5},
   {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+2 орбитальных шара',     apply:p=>p.orbs+=2},
-  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Оставляешь за собой ядовитый шлейф', apply:p=>p.gasTrail=true}
+  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Оставляешь за собой ядовитый шлейф', apply:p=>p.gasTrail=true},
+  {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка вдвое быстрее',  apply:p=>p.reloadMul*=0.5}
 ];
 
 // ================= ВРАГИ =================
@@ -1071,10 +1079,10 @@ function resetGame(){
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
        shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
-       gasTrail:false, gasT:0, ammo:0, reloadT:0};
+       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
-  P.ammo = magOf(P.weapon);
+  P.ammo = magCapacity();
   P.ammoWeapon = P.weapon;
   P.reloadT = 0;
   P.dmgMul *= 1 + 0.08*upLvl('dmg');
@@ -1387,13 +1395,13 @@ function startReload(){
   if (P.reloadT > 0) return;
   const r = reloadOf(P.weapon);
   if (!r) return;
-  if (P.ammo >= magOf(P.weapon)) return;
-  P.reloadT = r;
+  if (P.ammo >= magCapacity()) return;
+  P.reloadT = Math.max(0.15, r * (P.reloadMul || 1));
   sfx('reload');
 }
 function shoot(){
   if (P.reloadT > 0) return;
-  const mag = magOf(P.weapon);
+  const mag = magCapacity();
   if (mag > 0 && P.ammo <= 0){ startReload(); return; }
   const w = WEAPONS[P.weapon];
   const base = aimAngle();
@@ -1846,12 +1854,12 @@ function update(dt){
   // перезарядка оружия
   if (P.ammoWeapon !== P.weapon){
     P.ammoWeapon = P.weapon;
-    P.ammo = magOf(P.weapon);
+    P.ammo = magCapacity();
     P.reloadT = 0;
   }
   if (P.reloadT > 0){
     P.reloadT -= dt;
-    if (P.reloadT <= 0){ P.reloadT = 0; P.ammo = magOf(P.weapon); }
+    if (P.reloadT <= 0){ P.reloadT = 0; P.ammo = magCapacity(); }
   }
   // ядовитый шлейф от артефакта «Желчь»
   if (P.gasTrail && P.moving){
@@ -2758,7 +2766,7 @@ function drawHud(){
   ctx.textAlign='right'; ctx.fillStyle='#9fb0be';
   ctx.fillText(tutorial ? 'Обучение' : `Уровень ${lvl+1}/${TOT} · ${L.biomeName}`, W-18, 30);
   ctx.fillStyle='#b6d43a';
-  const magSize = magOf(P.weapon);
+  const magSize = magCapacity();
   const ammoTxt = magSize > 0 ? (P.reloadT > 0 ? 'перезарядка…' : P.ammo + '/' + magSize) : '∞';
   ctx.fillText(`${WEAPONS[P.weapon].name} · ${ammoTxt} · ${bossRef ? 'УБЕЙ БОССА' : 'убито ' + Math.min(kills,quota) + '/' + quota}`, W-18, 49);
   ctx.fillStyle='#ffb340';
@@ -2888,7 +2896,7 @@ window.__game = {
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
-  hurtPlayer, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy,
+  hurtPlayer, startReload, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy,
   debugSetKills(n){ kills = n; }
 };
 })();
