@@ -126,9 +126,11 @@
   .stick.on{opacity:1}
   .knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;
     background:radial-gradient(circle at 40% 35%,#d3ea6a,#7f9a1f);box-shadow:0 4px 16px rgba(0,0,0,.5)}
-  #fireBtn{position:absolute;right:24px;bottom:32px;width:92px;height:92px;border-radius:50%;
-    border:2px solid rgba(255,179,64,.6);background:rgba(120,70,10,.30);color:#ffd28a;
-    font-weight:800;letter-spacing:.05em;pointer-events:auto;display:none}
+  #fireBtn{position:absolute;right:0;top:50%;transform:translateY(-50%);
+    width:128px;height:128px;border-radius:64px 0 0 64px;
+    border:2px solid rgba(255,179,64,.65);border-right:none;
+    background:rgba(120,70,10,.38);color:#ffd28a;
+    font-weight:800;font-size:15px;letter-spacing:.06em;pointer-events:auto;display:none}
   #fireBtn.on{display:block}
   .ring{position:absolute;bottom:10%;width:124px;height:124px;border-radius:50%;transform:translateX(-50%);
     border:2px dashed rgba(182,212,58,.22);pointer-events:none}
@@ -381,7 +383,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.18.0 (16.11)';
+const VERSION = 'v1.19.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -982,13 +984,19 @@ const RELOAD = {
   shotgun:[6,1.9], minigun:[60,2.4], sniper:[3,2.0], rocket:[4,2.3],
   grenade:[2,2.4], plasma:[14,1.5], cryo:[16,1.4], railgun:[1,1.7], laser:[0,0]
 };
-const magOf = id => (RELOAD[id] ? RELOAD[id][0] : 0);
-const reloadOf = id => (RELOAD[id] ? RELOAD[id][1] : 0);
+const magOf = id => (RELOAD[id] ? RELOAD[id][0] : 0);const reloadOf = id => (RELOAD[id] ? RELOAD[id][1] : 0);
 function magCapacity(){
   const m = magOf(P.weapon);
   if (m <= 0) return 0;
   return Math.max(1, Math.round(m * (P.magMul || 1)));
 }
+// иконки оружия для HUD
+const WICON = {};
+WEAPON_ORDER.forEach(id => {
+  const im = new Image();
+  im.onload = () => { WICON[id] = im; };
+  im.src = 'icons/' + id + '.png';
+});
 
 const WEAPON_ART = {
   pistol:  {len:14, w:4, color:'#c9d3dd'},
@@ -2056,11 +2064,20 @@ function update(dt){
       en.cd -= dt;
       if (en.cd <= 0){ en.cd = 2.4; webs.push({x:en.x, y:en.y, r:46, life:5, max:5}); }
     }
-    // черепок взрывается вблизи
-    if (ENEMY[en.type] && ENEMY[en.type].kamikaze && d < 44){
-      explode(en.x, en.y, en.dmg, 84);
-      if (Math.hypot(P.x-en.x, P.y-en.y) < 92) hurtPlayer(en.dmg);
-      en.hp = 0;
+    // черепок: поджигает фитиль вблизи и взрывается через 2.5 с
+    if (ENEMY[en.type] && ENEMY[en.type].kamikaze){
+      if (en.fuse === undefined) en.fuse = -1;
+      if (en.fuse < 0 && d < 170){ en.fuse = 2.5; sfx('click'); }
+      if (en.fuse >= 0){
+        const prevBeep = Math.ceil(en.fuse * 2);
+        en.fuse -= dt;
+        if (Math.ceil(en.fuse * 2) !== prevBeep) sfx('click');
+        if (en.fuse <= 0){
+          explode(en.x, en.y, en.dmg, 84);
+          if (Math.hypot(P.x-en.x, P.y-en.y) < 92) hurtPlayer(en.dmg);
+          en.hp = 0;
+        }
+      }
     }
 
     // если монстр застрял на месте — телепортируем его в случайное место
@@ -2605,6 +2622,20 @@ function render(){
       }
       if (en.type === 'spitter'){ ctx.globalAlpha=.22; ctx.fillStyle='#a97bff';
         ctx.beginPath(); ctx.arc(ex,ey,en.r*.9,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
+
+      // фитиль черепка
+      if (en.type === 'skull' && en.fuse >= 0){
+        const blink = (Math.floor(en.fuse * 6) % 2) === 0;
+        ctx.globalAlpha = blink ? .85 : .35;
+        ctx.strokeStyle = '#ff5c3a'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(ex, ey, en.r + 8 + Math.sin(en.fuse*14)*3, 0, 6.3); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'center';
+        ctx.font = '700 ' + (W<700 ? 13 : 15) + 'px "Segoe UI", sans-serif';
+        ctx.fillStyle = '#ff5c3a';
+        ctx.fillText(en.fuse.toFixed(1), ex, ey - en.r - 10);
+        ctx.textAlign = 'left';
+      }
     }
     if (en.slowT > 0){ ctx.globalAlpha=.25; ctx.fillStyle='#8ef0ff';
       ctx.beginPath(); ctx.arc(ex,ey,en.r,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
@@ -2756,6 +2787,31 @@ function drawHud(){
   ctx.fillStyle=g; ctx.fillRect(bx,by,bw*Math.max(0,P.hp/P.maxHp),bh);
   ctx.strokeStyle='#1c1414'; ctx.lineWidth=2; ctx.strokeRect(bx,by,bw,bh);
   if (IMG.heart) ctx.drawImage(IMG.heart, bx-34, by-4, 30, 30);
+
+  // панель оружия под HP
+  const wy = by + bh + 10;
+  const wW = 232, wH = 54;
+  ctx.fillStyle = 'rgba(8,12,7,.72)';
+  ctx.fillRect(bx-2, wy, wW, wH);
+  ctx.strokeStyle = 'rgba(182,212,58,.35)'; ctx.lineWidth = 1;
+  ctx.strokeRect(bx-2, wy, wW, wH);
+  const wi = WICON[P.weapon];
+  if (wi) ctx.drawImage(wi, bx + 6, wy + 10, 34, 34);
+  else { ctx.fillStyle = '#9fb0be'; ctx.fillRect(bx+6, wy+10, 34, 34); }
+
+  const magSize2 = magCapacity();
+  ctx.textAlign = 'left';
+  ctx.font = '700 ' + (W<700 ? 20 : 24) + 'px "Segoe UI", sans-serif';
+  ctx.fillStyle = P.reloadT > 0 ? '#ffb340' : '#e2e9ef';
+  const ammoBig = magSize2 > 0 ? (P.ammo + ' / ' + magSize2) : '∞';
+  ctx.fillText(ammoBig, bx + 48, wy + 28);
+
+  ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#9fb0be';
+  const wname = WEAPONS[P.weapon].name + (P.reloadT > 0 ? ' · перезарядка' : '');
+  ctx.fillText(wname, bx + 48, wy + 45);
+
+  ctx.textAlign = 'left';
   ctx.font = '600 ' + fs1 + 'px "Segoe UI", sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#e2e9ef';
   ctx.fillText(`${Math.max(0,Math.ceil(P.hp))} / ${P.maxHp}`, bx+8, by+13);
   if (P.shield > 0){
