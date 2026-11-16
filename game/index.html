@@ -381,7 +381,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.15.0 (16.11)';
+const VERSION = 'v1.16.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -420,6 +420,7 @@ addEventListener('resize', applyLayout);
 // ================= ЗВУК =================
 let actx = null, noiseBuf = null;
 const SFX_BUF = {};
+let activeSfx = 0;
 const SFX_NAMES = [
   'impactWood_light_000','impactWood_medium_000','impactWood_heavy_000',
   'impactMetal_light_000','impactMetal_heavy_000','impactGeneric_light_000',
@@ -443,6 +444,7 @@ function sample(name, rate, vol, when){
   const a = audio(); if (!a) return false;
   const buf = SFX_BUF[name];
   if (!buf) return false;
+  if (activeSfx > 14) return false;            // защита от перегруза
   const userVol = (meta.vol === undefined ? 60 : meta.vol) / 100;
   const src = a.createBufferSource();
   src.buffer = buf;
@@ -450,6 +452,8 @@ function sample(name, rate, vol, when){
   const g = a.createGain();
   g.gain.value = vol * userVol;
   src.connect(g); g.connect(a.destination);
+  activeSfx++;
+  src.onended = () => { activeSfx = Math.max(0, activeSfx - 1); };
   src.start((a.currentTime || 0) + (when || 0));
   return true;
 }
@@ -555,6 +559,7 @@ function sfx(type){
                         tone(880, .2, 'sine', 1760, .24, .34); tone(1320, .45, 'sine', 1980, .36, .3);
                         burst(.4, 5000, 1); break;
     case 'levelup':tone(523, .12, 'sine'); tone(659, .12, 'sine', null, .12); tone(784, .2, 'sine', null, .24); break;
+    case 'reload':  tone(300, .06, 'square'); tone(420, .08, 'square', null, .12, .3); break;
     case 'click':  tone(900, .03, 'square'); break;
     case 'tp':     tone(500, .22, 'sine', 1200); break;
     case 'poison': burst(.5, 700, 1); tone(240, .5, 'sine', 120, 0, .22); break;
@@ -963,6 +968,15 @@ const WEAPONS = {
 };
 const WEAPON_ORDER = ['pistol','dual','smg','shocker','shotgun','minigun','sniper','rocket','grenade','plasma','cryo','railgun','laser'];
 
+// [патронов в магазине, секунд перезарядка]; 0 патронов = без перезарядки
+const RELOAD = {
+  pistol:[12,1.1], dual:[18,1.3], smg:[30,1.6], shocker:[20,1.4],
+  shotgun:[6,1.9], minigun:[60,2.4], sniper:[3,2.0], rocket:[4,2.3],
+  grenade:[2,2.4], plasma:[14,1.5], cryo:[16,1.4], railgun:[1,1.7], laser:[0,0]
+};
+const magOf = id => (RELOAD[id] ? RELOAD[id][0] : 0);
+const reloadOf = id => (RELOAD[id] ? RELOAD[id][1] : 0);
+
 const WEAPON_ART = {
   pistol:  {len:14, w:4, color:'#c9d3dd'},
   dual:    {len:11, w:3, color:'#c9d3dd', dual:true},
@@ -1016,7 +1030,7 @@ const ARTIFACTS = [
   {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+20% к скорости',         apply:p=>p.speed*=1.2},
   {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+5 HP за убийство',       apply:p=>p.vamp+=5},
   {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+2 орбитальных шара',     apply:p=>p.orbs+=2},
-  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Пули сильно отравляют',   apply:p=>p.poison+=2}
+  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Оставляешь за собой ядовитый шлейф', apply:p=>p.gasTrail=true}
 ];
 
 // ================= ВРАГИ =================
@@ -1048,9 +1062,13 @@ function resetGame(){
   P = {x:0,y:0,hp:100,maxHp:100,speed:210,dmgMul:1,rateMul:1,extraShots:0,pierce:0,
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
        shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
-       weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{}};
+       weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
+       gasTrail:false, gasT:0, ammo:0, reloadT:0};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
+  P.ammo = magOf(P.weapon);
+  P.ammoWeapon = P.weapon;
+  P.reloadT = 0;
   P.dmgMul *= 1 + 0.08*upLvl('dmg');
   P.speed *= 1 + 0.05*upLvl('speed');
   P.xpMul += 0.10*upLvl('xp');
@@ -1357,7 +1375,18 @@ function aimAngle(){
 }
 const wantFire = () => mode === 'auto' ? true : (input.fireHeld || mouse.down || keys.has(' ') || padFire);
 
+function startReload(){
+  if (P.reloadT > 0) return;
+  const r = reloadOf(P.weapon);
+  if (!r) return;
+  if (P.ammo >= magOf(P.weapon)) return;
+  P.reloadT = r;
+  sfx('reload');
+}
 function shoot(){
+  if (P.reloadT > 0) return;
+  const mag = magOf(P.weapon);
+  if (mag > 0 && P.ammo <= 0){ startReload(); return; }
   const w = WEAPONS[P.weapon];
   const base = aimAngle();
   P.aim = base;
@@ -1382,6 +1411,10 @@ function shoot(){
   parts.push({x:P.x+Math.cos(base)*24, y:P.y+Math.sin(base)*24, life:.08, max:.08, kind:'muzzle'});
   sfx('shoot');
   P.cool = w.delay * P.rateMul;
+  if (mag > 0){
+    P.ammo--;
+    if (P.ammo <= 0) startReload();
+  }
 }
 
 // ================= ВВОД =================
@@ -1403,6 +1436,7 @@ addEventListener('keydown', e => {
 
   if (dir) { keys.add(dir); e.preventDefault(); }
   if (e.code === 'Space'){ keys.add(' '); e.preventDefault(); }
+  if (e.code === 'KeyR' && state === 'play'){ startReload(); e.preventDefault(); }
   if (e.code === 'Escape'){ if (state === 'play' || state === 'pause'){ e.preventDefault(); togglePause(); } }
 });
 addEventListener('keyup', e => {
@@ -1801,6 +1835,24 @@ function startGame(){
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt){
   levelTime += dt; P.t += dt;
+  // перезарядка оружия
+  if (P.ammoWeapon !== P.weapon){
+    P.ammoWeapon = P.weapon;
+    P.ammo = magOf(P.weapon);
+    P.reloadT = 0;
+  }
+  if (P.reloadT > 0){
+    P.reloadT -= dt;
+    if (P.reloadT <= 0){ P.reloadT = 0; P.ammo = magOf(P.weapon); }
+  }
+  // ядовитый шлейф от артефакта «Желчь»
+  if (P.gasTrail && P.moving){
+    P.gasT += dt;
+    if (P.gasT > .22){
+      P.gasT = 0;
+      clouds.push({x:P.x, y:P.y, r:52, life:1.3, max:1.3, tick:0, dmg:4 + 2*(P.poison||1)});
+    }
+  }
   if (P.iframe > 0) P.iframe -= dt;
   if (tutorial) P.hp = P.maxHp;
   if (P.regen) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
@@ -2245,8 +2297,8 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
 }
 
 function hurtPlayer(dmg){
-  sfx('hurt');
   if (P.iframe > 0) return;
+  sfx('hurt');
   if (P.shield > 0){ P.shield--; P.iframe = .4; parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'}); return; }
   P.hp -= dmg*(1-Math.min(.8,P.armor));
   P.iframe = .7;
@@ -2698,7 +2750,9 @@ function drawHud(){
   ctx.textAlign='right'; ctx.fillStyle='#9fb0be';
   ctx.fillText(tutorial ? 'Обучение' : `Уровень ${lvl+1}/${TOT} · ${L.biomeName}`, W-18, 30);
   ctx.fillStyle='#b6d43a';
-  ctx.fillText(`${WEAPONS[P.weapon].name} · ${bossRef ? 'УБЕЙ БОССА' : 'убито ' + Math.min(kills,quota) + '/' + quota}`, W-18, 49);
+  const magSize = magOf(P.weapon);
+  const ammoTxt = magSize > 0 ? (P.reloadT > 0 ? 'перезарядка…' : P.ammo + '/' + magSize) : '∞';
+  ctx.fillText(`${WEAPONS[P.weapon].name} · ${ammoTxt} · ${bossRef ? 'УБЕЙ БОССА' : 'убито ' + Math.min(kills,quota) + '/' + quota}`, W-18, 49);
   ctx.fillStyle='#ffb340';
   ctx.fillText(`${L.mod.name} · золото ${meta.gold}`, W-18, 68);
 
