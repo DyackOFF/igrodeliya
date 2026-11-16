@@ -396,7 +396,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.23.1 (16.11)';
+const VERSION = 'v1.23.2 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1915,6 +1915,7 @@ function endTutorial(){
 $('btnTutorial').onclick = () => { sfx('click'); startTutorial(); };
 
 function startGame(){
+  tutorial = false; tutIdx = 0;
   meta.gold += 150*TIER();
   resetGame();
   $('btnNext').onclick = () => nextLevel();
