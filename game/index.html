@@ -305,6 +305,8 @@
     <div class="row"><b>Макар Масолов</b><span>атмосфера</span></div>
     <div class="row"><b>Игорь</b><span>тестирование</span></div>
     <div class="row"><b>Илья Кузнецов</b><span>идеи на будущее</span></div>
+    <div class="row" style="margin-top:10px;font-size:12px"><b>Музыка</b><span>Kevin MacLeod · incompetech.com · CC BY 4.0</span></div>
+    <div class="row" style="font-size:12px"><b>Звуки</b><span>Kenney · kenney.nl · CC0</span></div>
     <button id="btnBack1" style="margin-top:12px;width:100%">Назад</button>
   </div>
 </div>
@@ -379,7 +381,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.14.1 (16.11)';
+const VERSION = 'v1.15.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -458,6 +460,7 @@ function audio(){
       if (!C) return null;
       actx = new C();
       loadSfx();
+      loadMusicTracks();
     } catch(e){ return null; }
   }
   if (actx.state === 'suspended') actx.resume();
@@ -688,6 +691,7 @@ function musicStep(t){
 function musicScheduler(){
   const a = audio();
   if (!a || !MUSIC.running) return;
+  if (musicSrc) return;                 // играет записанный трек — процедурку не крутим
   if (MUSIC.nextTime < a.currentTime) MUSIC.nextTime = a.currentTime + 0.05;
   const ahead = 0.15;
   let guard = 0;
@@ -700,6 +704,8 @@ function musicScheduler(){
 function startMusic(){
   if (meta.music === 0) return;
   audio();
+  loadMusicTracks();
+  playTrackForMode();
   if (MUSIC.running) return;
   MUSIC.running = true;
   MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
@@ -709,6 +715,7 @@ function startMusic(){
 function stopMusic(){
   MUSIC.running = false;
   if (MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer = null; }
+  stopMusicTrack();
 }
 function setMusicMode(m){
   if (MUSIC.mode === m) return;
@@ -716,10 +723,12 @@ function setMusicMode(m){
   MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
   if (m === 'menu') MUSIC.bpm = 96;
   else if (m === 'calm') MUSIC.bpm = 84;
+  else if (m === 'boss') MUSIC.bpm = 150;
   else MUSIC.bpm = (STYLES[MUSIC.style] || STYLES[0]).bpm;
   const a = audio();
   MUSIC.nextTime = (a ? a.currentTime : 0) + 0.06;
   if (!MUSIC.running && meta.music !== 0) startMusic();
+  playTrackForMode();
 }
 function setMusicTrack(i){
   i = Math.max(0, Math.min(STYLES.length - 1, i));
@@ -727,6 +736,62 @@ function setMusicTrack(i){
   MUSIC.style = i;
   MUSIC.step = 0; MUSIC.bar = 0; MUSIC.phrase = null;
   if (MUSIC.mode === 'combat') MUSIC.bpm = STYLES[i].bpm;
+  playTrackForMode();
+}
+
+// ---- музыкальные треки (CC BY, Kevin MacLeod / incompetech.com) ----
+const MUSIC_FILES = {
+  menu:    'music/menu.mp3',
+  combat1: 'music/combat1.mp3',
+  combat2: 'music/combat2.mp3',
+  boss:    'music/boss.mp3'
+};
+const MUSIC_BUF = {};
+let musicSrc = null, musicTrackName = null, musicGain = null, musicLoading = false;
+
+function loadMusicTracks(){
+  if (musicLoading || typeof fetch !== 'function') return;
+  musicLoading = true;
+  const a = audio(); if (!a) return;
+  Object.entries(MUSIC_FILES).forEach(([k, url]) => {
+    fetch(url).then(r => r.arrayBuffer())
+      .then(b => new Promise(res => a.decodeAudioData(b, buf => res(buf), () => res(null))))
+      .then(buf => {
+        if (!buf) return;
+        MUSIC_BUF[k] = buf;
+        if (!musicSrc) playTrackForMode();
+      })
+      .catch(() => {});
+  });
+}
+function trackForMode(){
+  if (MUSIC.mode === 'menu') return 'menu';
+  if (MUSIC.mode === 'boss') return 'boss';
+  if (MUSIC.mode === 'calm') return 'menu';
+  return (MUSIC.style % 2) ? 'combat2' : 'combat1';
+}
+function stopMusicTrack(){
+  if (musicSrc){ try { musicSrc.stop(); } catch(e){} }
+  musicSrc = null; musicTrackName = null; musicGain = null;
+}
+function playTrackForMode(){
+  const a = audio(); if (!a) return;
+  const vol = musicVolume();
+  if (vol <= 0){ stopMusicTrack(); return; }
+  const name = trackForMode();
+  const buf = MUSIC_BUF[name];
+  if (!buf){ return; }               // ещё не загрузилось — играет процедурка
+  if (musicTrackName === name && musicSrc) return;
+  stopMusicTrack();
+  const src = a.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  const g = a.createGain(); g.gain.value = vol * 0.55;
+  src.connect(g); g.connect(a.destination);
+  src.start();
+  musicSrc = src; musicTrackName = name; musicGain = g;
+}
+function refreshMusicVolume(){
+  if (musicGain) musicGain.gain.value = musicVolume() * 0.55;
 }
 
 // ================= ГЕЙМПАД =================
@@ -1006,7 +1071,7 @@ function startLevel(i){
   quota = L.quota; kills = 0; levelTime = 0;
   spawnTimer = .8; flow = null; flowT = 0;
   setMusicTrack(Math.floor(i / 5));
-  setMusicMode('combat');
+  setMusicMode(L.boss ? 'boss' : 'combat');
   // здоровье между уровнями НЕ восстанавливается само — только за улучшение «Лечение»
   P.hp = Math.min(P.maxHp, P.hp + 15*upLvl('heal'));
   P.shield = P.shieldMax;
@@ -1593,6 +1658,8 @@ $('btnMute').onclick = () => { meta.sound = meta.sound === 0 ? 1 : 0; saveMeta()
 $('musRange').oninput = e => {
   meta.musicVol = +e.target.value; meta.music = meta.musicVol > 0 ? 1 : 0;
   $('musLabel').textContent = meta.musicVol + '%'; saveMeta(); syncSettings();
+  refreshMusicVolume();
+  if (meta.music === 0) stopMusicTrack(); else if (state !== 'menu' || true) playTrackForMode();
 };
 $('btnMusic').onclick = () => {
   meta.music = meta.music === 0 ? 1 : 0; saveMeta(); syncSettings();
@@ -1991,6 +2058,7 @@ function update(dt){
           kills = 0;
           quota = LEVELS[lvl].quota;
           toast = 'ДОБЕЙ ОСТАВШИХСЯ'; toastT = 3;
+          setMusicMode('combat');
         }
       }
       if (state !== 'play') return;

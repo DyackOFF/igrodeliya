@@ -1,0 +1,13 @@
+Музыка в этой папке — композиции Kevin MacLeod (incompetech.com).
+Лицензия: Creative Commons Attribution 4.0 (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Требуется указание автора (оно есть в игре: экран «Разработчики» и этот файл).
+
+Треки:
+- menu.mp3    — "Gathering Darkness" — Kevin MacLeod (incompetech.com), CC BY 4.0
+- combat1.mp3 — "Killers" — Kevin MacLeod (incompetech.com), CC BY 4.0
+- combat2.mp3 — "Volatile Reaction" — Kevin MacLeod (incompetech.com), CC BY 4.0
+- boss.mp3    — "Five Armies" — Kevin MacLeod (incompetech.com), CC BY 4.0
+
+Файлы перекодированы в mp3 112 kbps для веба.
