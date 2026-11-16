@@ -119,13 +119,9 @@
   #drumFlash.play{animation:flashFx .6s ease-out}
   /* падающие лица на экране «Разработчики» */
   .devfaces{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
-  .devfaces img{position:absolute;top:-24%;height:auto;animation:devfall linear infinite;
-    filter:drop-shadow(0 8px 18px rgba(0,0,0,.55));will-change:transform}
-  @keyframes devfall{
-    0%{transform:translate3d(0,-12vh,0) rotate(0deg)}
-    100%{transform:translate3d(var(--drift,0px),118vh,0) rotate(var(--rot,15deg))}
-  }
-  @media (prefers-reduced-motion: reduce){ .devfaces{display:none} }
+  .devfaces img{position:absolute;top:0;height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.55))}
+  /* на телефоне панель почти во весь экран — делаем её чуть прозрачной, чтобы лица были видны */
+  @media (max-width:640px){ #devs .panel{background:rgba(10,14,9,.86)} }
   .rollBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
   #touch{position:fixed;inset:0;z-index:4;display:none;pointer-events:none}
@@ -161,6 +157,7 @@
   .row{font-size:15px}
   .row .nm small{font-size:12.5px}
   .row .lv{font-size:12.5px}
+  @media (max-width:560px){ .row{flex-wrap:wrap;row-gap:2px;text-align:left} }
   .stats{font-size:13.5px}
   .goldbar{font-size:15px}
   .tag{font-size:11.5px}
@@ -391,7 +388,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.24.0 (16.11)';
+const VERSION = 'v1.24.1 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1697,16 +1694,20 @@ const DEV_FACES = ['assets/devs/face1.png','assets/devs/face2.png','assets/devs/
 function spawnDevFaces(){
   const box = $('devFaces'); if (!box) return;
   box.innerHTML = '';
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   for (let i = 0; i < 14; i++){
     const im = new Image();
     im.src = DEV_FACES[i % DEV_FACES.length];
     im.alt = '';
     const w = 46 + Math.random()*86;
-    im.style.cssText = `width:${w|0}px;left:${(Math.random()*100).toFixed(1)}%;` +
-      `animation-duration:${(10 + Math.random()*11).toFixed(1)}s;animation-delay:-${(Math.random()*21).toFixed(1)}s;` +
-      `--drift:${((Math.random()*2-1)*90)|0}px;--rot:${((Math.random()*2-1)*40)|0}deg;` +
-      `opacity:${(0.22 + Math.random()*0.3).toFixed(2)}`;
+    im.style.cssText = `width:${w|0}px;left:${(Math.random()*100).toFixed(1)}%;opacity:${(0.22 + Math.random()*0.3).toFixed(2)}`;
     box.appendChild(im);
+    if (still || !im.animate){ im.style.top = (Math.random()*88).toFixed(1) + '%'; continue; }
+    const drift = (Math.random()*2-1)*90, rot = (Math.random()*2-1)*40;
+    im.animate([
+      { transform: 'translate3d(0,-40vh,0) rotate(0deg)' },
+      { transform: `translate3d(${drift|0}px,120vh,0) rotate(${rot|0}deg)` }
+    ], { duration: 10000 + Math.random()*11000, iterations: Infinity, delay: -(Math.random()*21000), easing: 'linear' });
   }
 }
 $('logoBtn').onclick = () => { sfx('click'); hide('menu'); spawnDevFaces(); show('devs'); };
