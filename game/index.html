@@ -383,7 +383,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.20.1 (16.11)';
+const VERSION = 'v1.21.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1042,19 +1042,19 @@ const ITEMS = [
 ];
 
 const ARTIFACTS = [
-  {id:'a_heart', ic:'❤', name:'Сердце горы',    desc:'+60 к максимуму HP',      apply:p=>{p.maxHp+=60;p.hp+=60;}},
-  {id:'a_blade', ic:'⚔', name:'Клинок предков', desc:'+35% к урону',            apply:p=>p.dmgMul*=1.35},
-  {id:'a_clock', ic:'⏱', name:'Часы бездны',    desc:'+25% к темпу стрельбы',   apply:p=>p.rateMul*=.75},
-  {id:'a_mag',   ic:'◎', name:'Магнит глубин',  desc:'+80% опыта',              apply:p=>p.xpMul+=.8},
-  {id:'a_shield',ic:'⛊', name:'Щит камня',      desc:'-25% входящего урона',    apply:p=>p.armor+=.25},
-  {id:'a_flame', ic:'✹', name:'Пламя',          desc:'+2 пули в залпе',         apply:p=>p.extraShots+=2},
-  {id:'a_prism', ic:'↺', name:'Призма',         desc:'Рикошет пуль',            apply:p=>p.ricochet=true},
-  {id:'a_eye',   ic:'➹', name:'Глаз пещеры',    desc:'Сильное самонаведение',   apply:p=>p.homing+=2},
-  {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+20% к скорости',         apply:p=>p.speed*=1.2},
-  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+5 HP за убийство',       apply:p=>p.vamp+=5},
-  {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+2 орбитальных шара',     apply:p=>p.orbs+=2},
-  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Оставляешь за собой ядовитый шлейф', apply:p=>p.gasTrail=true},
-  {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка вдвое быстрее',  apply:p=>p.reloadMul*=0.5},
+  {id:'a_heart', ic:'❤', name:'Сердце горы',    desc:'+120 HP и регенерация 1 HP/с',   apply:p=>{p.maxHp+=120;p.hp+=120;p.regen+=1;}},
+  {id:'a_blade', ic:'⚔', name:'Клинок предков', desc:'+60% урон и +10% крит',          apply:p=>{p.dmgMul*=1.6;p.crit+=0.10;}},
+  {id:'a_clock', ic:'⏱', name:'Часы бездны',    desc:'+40% темп и пули на 20% быстрее',apply:p=>{p.rateMul*=0.6;p.projMul*=1.2;}},
+  {id:'a_mag',   ic:'◎', name:'Магнит глубин',  desc:'+100% опыта и +50% золота',      apply:p=>{p.xpMul+=1.0;p.goldMul*=1.5;}},
+  {id:'a_shield',ic:'⛊', name:'Щит камня',      desc:'−35% урона и +1 щит',            apply:p=>{p.armor+=0.35;p.shieldMax+=1;p.shield+=1;}},
+  {id:'a_flame', ic:'✹', name:'Пламя',          desc:'+3 пули и +25% урон',            apply:p=>{p.extraShots+=3;p.dmgMul*=1.25;}},
+  {id:'a_prism', ic:'↺', name:'Призма',         desc:'Рикошет и пробитие +1',          apply:p=>{p.ricochet=true;p.pierce+=1;}},
+  {id:'a_eye',   ic:'➹', name:'Глаз пещеры',    desc:'Сильное наведение и пробитие +1',apply:p=>{p.homing+=3;p.pierce+=1;}},
+  {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+30% скорость, паутина не держит',apply:p=>{p.speed*=1.3;p.webImmune=true;}},
+  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+8 HP за убийство и +10% урон',  apply:p=>{p.vamp+=8;p.dmgMul*=1.1;}},
+  {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+3 орбиты, урон орбит вдвое',    apply:p=>{p.orbs+=3;p.orbMul*=2;}},
+  {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Сильный ядовитый шлейф за спиной',apply:p=>p.gasTrail=true},
+  {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка ×0.4 и +50% магазин',apply:p=>{p.reloadMul*=0.4;p.magMul*=1.5;}},
   {id:'a_reroll',ic:'⏳', name:'Часы перемотки', desc:'Все прошлые барабаны крутятся заново', ultra:true, apply:p=>{p.rerollLeft = plvl;}}
 ];
 
@@ -1088,7 +1088,8 @@ function resetGame(){
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
        shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
-       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0};
+       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0,
+       projMul:1, webImmune:false, orbMul:1};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
   P.ammo = magCapacity();
@@ -1432,7 +1433,7 @@ function shoot(){
     const isCrit = Math.random() < P.crit;
     bullets.push({
       x: P.x+Math.cos(ang)*sp, y: P.y+Math.sin(ang)*sp,
-      vx: Math.cos(ang)*w.speed, vy: Math.sin(ang)*w.speed,
+      vx: Math.cos(ang)*w.speed*(P.projMul||1), vy: Math.sin(ang)*w.speed*(P.projMul||1),
       dmg: dmg*(isCrit?2.5:1), crit: isCrit,
       pierce: (w.pierce ?? P.pierce), hit: new Set(),
       rocket: !!w.rocket, aoe: w.aoe || (P.boom?70:0) || (w.rocket?70:0),
@@ -1882,7 +1883,7 @@ function update(dt){
     P.gasT += dt;
     if (P.gasT > .22){
       P.gasT = 0;
-      clouds.push({x:P.x, y:P.y, r:52, life:1.3, max:1.3, tick:0, dmg:4 + 2*(P.poison||1)});
+      clouds.push({x:P.x, y:P.y, r:72, life:1.5, max:1.5, tick:0, dmg:8 + 4*(P.poison||1)});
     }
   }
   if (P.iframe > 0) P.iframe -= dt;
@@ -1909,7 +1910,7 @@ function update(dt){
   P.moving = mag > .05;
   if (P.moving){
     let webSlow = 1;
-    for (const w of webs) if (Math.hypot(P.x-w.x, P.y-w.y) < w.r) webSlow = Math.min(webSlow, .5);
+    if (!P.webImmune) for (const w of webs) if (Math.hypot(P.x-w.x, P.y-w.y) < w.r) webSlow = Math.min(webSlow, .5);
     const nx = vx/(mag||1), ny = vy/(mag||1), step = P.speed*dt*webSlow;
     if (canStand(P.x+nx*step, P.y, 13)) P.x += nx*step;
     if (canStand(P.x, P.y+ny*step, 13)) P.y += ny*step;
@@ -1933,7 +1934,7 @@ function update(dt){
       const ox = P.x+Math.cos(a)*70, oy = P.y+Math.sin(a)*70;
       for (const en of enemies){
         if (en.orbHit <= 0 && Math.hypot(en.x-ox, en.y-oy) < en.r+10){
-          en.hp -= 14*P.dmgMul; en.flash = .1; en.orbHit = .35;
+          en.hp -= 14*P.dmgMul*(P.orbMul||1); en.flash = .1; en.orbHit = .35;
         }
       }
     }
