@@ -230,7 +230,10 @@
     <div id="shopRows"></div>
     <button id="btnReset" class="small" style="width:100%;margin-top:8px">Сбросить улучшения (вернуть 50%)</button>
     <h3 style="margin:14px 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7b8996">Оружие</h3>
+    <p style="font-size:12px;color:#7b8996;margin:0">Следующее открывается после покупки предыдущего.</p>
     <div id="weaponRows"></div>
+    <h3 style="margin:14px 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7b8996">Сложность</h3>
+    <div id="prestigeBox"></div>
     <button id="btnShopBack" style="margin-top:12px;width:100%">Назад</button>
   </div>
 </div>
@@ -383,7 +386,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.21.0 (16.11)';
+const VERSION = 'v1.22.0 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -846,20 +849,31 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
 
 // ================= МЕТА =================
 const META_KEY = 'crazy_mountaine_meta_v2';
-let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, sound:1, shotSound:1, uiSound:1, vol:60, music:1, musicVol:35, layout:'auto'};
+let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, tier:0, sound:1, shotSound:1, uiSound:1, vol:60, music:1, musicVol:35, layout:'auto'};
 try { const raw = localStorage.getItem(META_KEY); if (raw) meta = Object.assign(meta, JSON.parse(raw)); } catch(e){}
 layoutMode = meta.layout || 'auto';
 function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e){} }
 const upLvl = id => meta.up[id] || 0;
 
 const META_UP = [
-  {id:'hp',    name:'Запас HP',  desc:'+15 HP на старте',    max:6, cost:l=>120+l*120},
-  {id:'dmg',   name:'Урон',      desc:'+8% к урону',         max:6, cost:l=>150+l*150},
-  {id:'speed', name:'Скорость',  desc:'+5% к бегу',          max:5, cost:l=>120+l*120},
-  {id:'xp',    name:'Опыт',      desc:'+10% опыта',          max:5, cost:l=>160+l*160},
-  {id:'gold',  name:'Удача',     desc:'+15% золота',         max:5, cost:l=>200+l*200},
-  {id:'heal',  name:'Лечение',   desc:'+15 HP после уровня', max:5, cost:l=>100+l*100}
+  {id:'hp',    name:'Запас HP',  desc:'+15 HP на старте',    max:10, cost:l=>150+l*150},
+  {id:'dmg',   name:'Урон',      desc:'+8% к урону',         max:10, cost:l=>180+l*180},
+  {id:'speed', name:'Скорость',  desc:'+5% к бегу',          max:10, cost:l=>150+l*150},
+  {id:'xp',    name:'Опыт',      desc:'+10% опыта',          max:10, cost:l=>200+l*200},
+  {id:'gold',  name:'Удача',     desc:'+15% золота',         max:10, cost:l=>240+l*240},
+  {id:'heal',  name:'Лечение',   desc:'+15 HP после уровня', max:10, cost:l=>120+l*120}
 ];
+
+// ===== Сложности (погружения) =====
+// После полной прокачки магазина открывается переход на следующий слой:
+// всё обнуляется, враги крепче, но добыча щедрее.
+const TIER = () => meta.tier || 0;
+const tierHp  = () => 1 + 0.30*TIER();
+const tierDmg = () => 1 + 0.25*TIER();
+const tierLoot = () => 1 + 0.25*TIER();
+const allUpMaxed = () => META_UP.every(u => upLvl(u.id) >= u.max);
+const allWeapons = () => WEAPON_ORDER.every(id => meta.unlocked[id]);
+const canPrestige = () => allUpMaxed() && allWeapons();
 
 // ================= АССЕТЫ =================
 const IMG = {};
@@ -1194,8 +1208,8 @@ function spawnEnemy(type, near){
   const mul = L.hp * (1 + lvl*0.05);
   enemies.push({
     x:pos.x, y:pos.y, type, t:0, r:b.r, scale:b.scale,
-    hp:b.hp*mul, maxHp:b.hp*mul, speed:b.speed*L.speed,
-    dmg:b.dmg, xp:b.xp, flash:0, phase:Math.random()*6.28, cd:1+Math.random()*2,
+    hp:b.hp*mul*tierHp(), maxHp:b.hp*mul*tierHp(), speed:b.speed*L.speed,
+    dmg:b.dmg*tierDmg(), xp:b.xp, flash:0, phase:Math.random()*6.28, cd:1+Math.random()*2,
     slowT:0, poisonT:0, poisonDmg:0, boss:false, orbHit:0,
     idle:0, lastX:pos.x, lastY:pos.y
   });
@@ -1205,10 +1219,10 @@ function spawnBoss(kind, name){
   spawnBossAt(kind, name, pos.x, pos.y, 0, 1);
 }
 function spawnBossAt(kind, name, x, y, phase, hpScale){
-  let hp = 500 * (1 + lvl*0.18) * 3 * (hpScale || 1);
+  let hp = 500 * (1 + lvl*0.18) * 3 * (hpScale || 1) * tierHp();
   bossRef = {
     x, y, type:'boss', bossKind:kind, name:name||'Босс', t:0, phase: phase || 0,
-    r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48, xp:150,
+    r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48*tierDmg(), xp:150,
     flash:0, phaseT:0, cd:1.5, dashT:0, windT:0, dashVX:0, dashVY:0, chargeFatigue:1,
     slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0,
     cocoon:false, wave:0, waitT:0
@@ -1591,7 +1605,7 @@ function escapeScreen(){
 }
 
 function refreshMenu(){
-  $('menuGold').textContent = 'Золото: ' + meta.gold;
+  $('menuGold').textContent = 'Золото: ' + meta.gold + (TIER() ? ' · погружение ' + TIER() : '');
   $('menuBest').textContent = 'Рекорд: ' + (meta.best ? 'уровень ' + meta.best : '—');
 }
 function spentOnUpgrades(){
@@ -1623,20 +1637,40 @@ function refreshShop(){
     box.appendChild(row);
   }
   const wbox = $('weaponRows'); wbox.innerHTML = '';
-  for (const id of WEAPON_ORDER){
+  WEAPON_ORDER.forEach((id, i) => {
     const w = WEAPONS[id], owned = !!meta.unlocked[id];
+    const prev = i === 0 || !!meta.unlocked[WEAPON_ORDER[i-1]];
     const row = document.createElement('div');
     row.className = 'row';
     row.innerHTML = `<div class="nm" style="display:flex;align-items:center;gap:8px">
       <img class="ico" src="icons/${id}.png" alt="" style="margin:0;width:22px;height:22px" onerror="this.style.display='none'">
-      <span><b>${w.name}</b><small>${w.price?'цена '+w.price+' зол.':'стартовое'}</small></span></div>
-      <div><button class="small" ${owned||meta.gold<w.price?'disabled':''}>${owned?'ЕСТЬ':'Купить'}</button></div>`;
-    if (!owned) row.querySelector('button').onclick = () => {
+      <span><b>${w.name}</b><small>${owned?'открыто':prev?'цена '+w.price+' зол.':'нужно купить '+WEAPONS[WEAPON_ORDER[i-1]].name}</small></span></div>
+      <div><button class="small" ${owned||!prev||meta.gold<w.price?'disabled':''}>${owned?'ЕСТЬ':prev?'Купить':'ЗАКРЫТО'}</button></div>`;
+    if (!owned && prev) row.querySelector('button').onclick = () => {
       if (meta.gold < w.price) return;
       meta.gold -= w.price; meta.unlocked[id] = true; saveMeta(); refreshShop(); refreshMenu();
     };
     wbox.appendChild(row);
-  }
+  });
+  refreshPrestige();
+}
+
+function refreshPrestige(){
+  const box = $('prestigeBox'); if (!box) return;
+  const T = TIER(), ready = canPrestige();
+  const upDone = META_UP.filter(u => upLvl(u.id) >= u.max).length, wpDone = WEAPON_ORDER.filter(id => meta.unlocked[id]).length;
+  box.innerHTML = `<div class="row"><div class="nm"><b>Погружение ${T}</b>
+    <small>${ready ? `всё прокачано — можно уйти на слой ${T+1}: враги крепче, добыча богаче` : `макс. улучшений ${upDone}/${META_UP.length} · оружия ${wpDone}/${WEAPON_ORDER.length}`}</small></div>
+    <div><button class="small" ${ready?'':'disabled'}>${ready?'Вглубь':'ЗАКРЫТО'}</button></div></div>`;
+  if (ready) box.querySelector('button').onclick = prestige;
+}
+
+function prestige(){
+  const T = TIER() + 1;
+  if (!confirm(`Начать погружение ${T}?\n\nВсё обнулится: золото, улучшения, оружие.\nВраги: +30% HP, +25% урона.\nДобыча: +25% золота, +10% опыта, +150 золота на старте забега.`)) return;
+  meta.tier = T;
+  meta.gold = 0; meta.up = {}; meta.unlocked = {pistol:true}; meta.weapon = 'pistol';
+  saveMeta(); refreshShop(); refreshMenu();
 }
 function refreshRecords(){
   const box = $('recordRows'); box.innerHTML = '';
@@ -1855,6 +1889,7 @@ function endTutorial(){
 $('btnTutorial').onclick = () => { sfx('click'); startTutorial(); };
 
 function startGame(){
+  meta.gold += 150*TIER();
   resetGame();
   $('btnNext').onclick = () => nextLevel();
   ['menu','shop','settings','devs','help','levelend','final','pick','records'].forEach(hide);
@@ -2364,13 +2399,13 @@ function explode(x,y,dmg,r){
   for (const en of enemies) if (!en.cocoon && Math.hypot(en.x-x, en.y-y) < r+en.r){ en.hp -= dmg; en.flash = .12; }
 }
 function addGold(n){
-  meta.goldAcc = (meta.goldAcc || 0) + n * P.goldMul * 0.2;
+  meta.goldAcc = (meta.goldAcc || 0) + n * P.goldMul * 0.2 * tierLoot();
   const whole = Math.floor(meta.goldAcc);
   if (whole > 0){ meta.gold += whole; meta.goldAcc -= whole; }
 }
 function gainXp(n){
   if (tutorial && (!TUT[tutIdx] || TUT[tutIdx].kind !== 'level')) return;
-  xp += n;
+  xp += n * (1 + 0.10*TIER());
   if (xp >= xpNeed){
     xp -= xpNeed; plvl++; xpNeed = Math.round(xpNeed*1.42);
     openDrum();
@@ -2542,9 +2577,8 @@ function render(){
         }
         ctx.fillStyle = 'rgba(255,255,255,.25)';
         ctx.beginPath(); ctx.ellipse(ex-10, ey-14, 10, 16, 0, 0, 6.3); ctx.fill();
-        return;
       }
-      if (en.bossKind === 'skelord'){
+      else if (en.bossKind === 'skelord'){
         ctx.fillStyle = '#ded7c4';
         ctx.fillRect(ex-16, ey-6, 32, 46);
         ctx.beginPath(); ctx.arc(ex, ey-18, 20, 0, 6.3); ctx.fill();
@@ -2556,9 +2590,8 @@ function render(){
         ctx.fillRect(ex+14, ey+2, 8, 30);
         ctx.fillStyle = 'rgba(192,57,43,.35)';
         ctx.beginPath(); ctx.arc(ex, ey, 40, 0, 6.3); ctx.fill();
-        return;
       }
-      if (en.bossKind === 'cocoon'){
+      else if (en.bossKind === 'cocoon'){
         // паучиха
         ctx.strokeStyle = '#8a6bff'; ctx.lineWidth = 3;
         for (let k = 0; k < 8; k++){
@@ -2571,8 +2604,8 @@ function render(){
         ctx.fillStyle = '#111';
         ctx.beginPath(); ctx.arc(ex-9, ey-6, 4, 0, 6.3); ctx.fill();
         ctx.beginPath(); ctx.arc(ex+9, ey-6, 4, 0, 6.3); ctx.fill();
-        return;
       }
+      else {
       const im = IMG[Math.floor(en.t*3)%2 ? 'slime1':'slime0'];
       if (im) ctx.drawImage(im, ex-en.scale/2, ey-en.scale/2, en.scale, en.scale);
       ctx.globalAlpha = .3; ctx.fillStyle = '#c0392b';
@@ -2589,6 +2622,7 @@ function render(){
         ctx.beginPath(); ctx.arc(ex - en.dashVX*.02, ey - en.dashVY*.02, 26, 0, 6.3); ctx.fill();
         ctx.beginPath(); ctx.arc(ex - en.dashVX*.04, ey - en.dashVY*.04, 18, 0, 6.3); ctx.fill();
         ctx.globalAlpha = 1;
+      }
       }
     } else {
       const def = ENEMY[en.type];
