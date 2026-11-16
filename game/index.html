@@ -406,7 +406,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.26.2 (16.11)';
+const VERSION = 'v1.26.3 (16.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -825,12 +825,29 @@ function playTrackForMode(){
   src.buffer = buf; src.loop = true;
   const g = a.createGain(); g.gain.value = vol * 0.55;
   src.connect(g); g.connect(a.destination);
+  // страховка: если браузер всё же оборвал трек, запускаем заново
+  src.onended = () => {
+    if (musicSrc === src){ musicSrc = null; musicTrackName = null; musicGain = null; }
+    if (state === 'play' || state === 'menu') setTimeout(playTrackForMode, 80);
+  };
   src.start();
   musicSrc = src; musicTrackName = name; musicGain = g;
 }
 function refreshMusicVolume(){
   if (musicGain) musicGain.gain.value = musicVolume() * 0.55;
 }
+// сторож музыки: браузер может усыпить звук посреди боя и трек не вернётся сам
+function musicWatchdog(){
+  if (!actx || meta.music === 0) return;
+  if (actx.state === 'suspended') actx.resume();
+  if (state !== 'play' && state !== 'menu') return;
+  if (!MUSIC.running) startMusic();
+  else if (!musicSrc) playTrackForMode();
+}
+setInterval(musicWatchdog, 1500);
+addEventListener('visibilitychange', () => {
+  if (!document.hidden && actx && actx.state === 'suspended') actx.resume();
+});
 
 // ================= ГЕЙМПАД =================
 let padFire = false, padPausePrev = false;
@@ -3110,6 +3127,7 @@ window.__game = {
   get bossRef(){return bossRef}, get portal(){return portal}, get quota(){return quota}, get flow(){return flow},
   get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get stacks(){ return stacks; }, get pendingSkel(){ return pendingSkel; }, get musicMode(){ return MUSIC.mode; }, musicTickPublic(){ musicScheduler(); },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
+  musicWatchdog, stopMusicTrack, get musicTrack(){ return musicTrackName; },
   startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
