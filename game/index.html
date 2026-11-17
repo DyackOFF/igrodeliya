@@ -89,9 +89,10 @@
     color:#10160c;box-shadow:0 0 26px rgba(182,212,58,.55),0 6px 22px rgba(0,0,0,.45);
     animation:bannerPulse 1.9s infinite;transform-origin:center}
   .bigBanner:hover{filter:brightness(1.12) saturate(1.1);transform:scale(1.03)}
-  .bigBanner .bb-title{font-weight:900;font-size:clamp(15px,2.6vw,21px);letter-spacing:.12em;
-    text-shadow:0 1px 0 rgba(255,255,255,.55)}
-  .bigBanner .bb-sub{font-size:10.5px;letter-spacing:.05em;opacity:.82}
+  .bigBanner .bb-title{font-weight:900;font-size:clamp(17px,3vw,25px);letter-spacing:.12em;
+    text-shadow:0 1px 0 rgba(255,255,255,.65),0 0 18px rgba(255,255,200,.8);animation:bbBreath 1.9s ease-in-out infinite}
+  .bigBanner .bb-sub{font-size:11px;letter-spacing:.08em;font-weight:700;opacity:.9}
+  @keyframes bbBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
   .bigBanner .bb-shine{position:absolute;top:0;left:-45%;width:40%;height:100%;
     background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.85),rgba(255,255,255,0));
     transform:skewX(-18deg);animation:bbShine 2.6s infinite}
@@ -266,8 +267,8 @@
   <div class="tag"><span id="verTag">v0.0</span> · 36 уровней · 9 боссов · гимназия им. Н.В. Пушкова</div>
   <button id="bigBanner" class="bigBanner hidden">
     <span class="bb-shine"></span>
-    <span class="bb-title">БОЛЬШОЕ ОБНОВЛЕНИЕ</span>
-    <span class="bb-sub">v1.30.0 · 36 уровней · 9 боссов · нажми, чтобы прочитать</span>
+    <span class="bb-title">✨ БОЛЬШОЕ ОБНОВЛЕНИЕ ✨</span>
+    <span class="bb-sub">v1.30.0 · 36 уровней · 9 боссов · СМОТРЕТЬ ИЗМЕНЕНИЯ ▸</span>
   </button>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
   <div class="btns">
