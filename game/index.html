@@ -501,7 +501,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.31.1 (17.11)';
+const VERSION = 'v1.31.2 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -599,8 +599,41 @@ function noise(){
   }
   const src = a.createBufferSource(); src.buffer = noiseBuf; return src;
 }
-function sfx(type){
+// грустный тромбон на смерть: синтез, без внешних файлов
+function sadTrombone(){
   if (meta.sound === 0) return;
+  const a = audio(); if (!a) return;
+  const now = a.currentTime + .05;
+  const notes = [
+    {f:233.08, d:.32},   // Bb3
+    {f:220.00, d:.32},   // A3
+    {f:207.65, d:.32},   // G#3
+    {f:196.00, d:1.05}   // G3, последняя тянется и «сползает»
+  ];
+  let t = now;
+  for (const n of notes){
+    const osc = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+    const vib = a.createOscillator(), vibG = a.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(n.f, t);
+    osc.frequency.linearRampToValueAtTime(n.f*.9, t + n.d*.92);
+    vib.frequency.value = 5.5; vibG.gain.value = 3.2;
+    vib.connect(vibG); vibG.connect(osc.frequency);
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1500, t);
+    lp.frequency.linearRampToValueAtTime(520, t + n.d);
+    lp.Q.value = 6;
+    g.gain.setValueAtTime(.0001, t);
+    g.gain.exponentialRampToValueAtTime(.55, t + .05);
+    g.gain.exponentialRampToValueAtTime(.0001, t + n.d*.96);
+    osc.connect(lp); lp.connect(g); g.connect(a.destination);
+    osc.start(t); osc.stop(t + n.d);
+    vib.start(t); vib.stop(t + n.d);
+    t += n.d;
+  }
+}
+
+function sfx(type){  if (meta.sound === 0) return;
   const UI_TYPES = ['click','drum','roll_common','roll_rare','roll_epic','roll_artifact','take','levelup'];
   if (type === 'shoot' && meta.shotSound === 0) return;
   if (UI_TYPES.indexOf(type) >= 0 && meta.uiSound === 0) return;
@@ -1901,7 +1934,17 @@ const mouse = {x:W/2, y:H/2-100, down:false};
 const input = {moveX:0, moveY:0, aimX:0, aimY:0, aimActive:false, fireHeld:false};
 const MOVE_CODES = {KeyW:'up', KeyA:'left', KeyS:'down', KeyD:'right', ArrowUp:'up', ArrowLeft:'left', ArrowDown:'down', ArrowRight:'right'};
 
+// когда фокус в поле ввода (имя в рекордах), клавиши должны печатать, а не рулить меню
+const isTyping = e => {
+  const t = e.target;
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+};
+
 addEventListener('keydown', e => {
+  if (isTyping(e)){                       // печатаем имя: игру не трогаем
+    if (e.code === 'Escape') e.target.blur();
+    return;
+  }
   const dir = MOVE_CODES[e.code];
   const anyScreen = document.querySelector('.screen:not(.hidden)');
 
@@ -1918,6 +1961,7 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape'){ if (state === 'play' || state === 'pause'){ e.preventDefault(); togglePause(); } }
 });
 addEventListener('keyup', e => {
+  if (isTyping(e)) return;
   const dir = MOVE_CODES[e.code];
   if (dir) keys.delete(dir);
   if (e.code === 'Space') keys.delete(' ');
@@ -2148,6 +2192,10 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.31.2', items:[
+    'На экране смерти теперь играет грустный тромбон.',
+    'Исправлен ввод имени: раньше WASD листали меню и буквы не печатались — теперь в поле имени спокойно набирается текст.'
+  ]},
   {v:'v1.31.1', items:[
     'Починил обучение: после большого обновления оно падало на первом же уроке, теперь все шесть уроков проходятся.'
   ]},
@@ -3559,7 +3607,7 @@ $('btnAgain').onclick = () => {
   hide('final'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); updateTouchVisibility();
 };
 function gameOver(){
-  state = 'over'; sfx('lose'); saveMeta(); clearRun();
+  state = 'over'; sfx('lose'); sadTrombone(); saveMeta(); clearRun();
   $('endTitle').textContent = 'Ты погиб';
   $('endSub').textContent = `Уровень ${lvl+1} из ${TOT} · ${LEVELS[lvl].biomeName}`;
   $('endStats').innerHTML = `<span>Убито: <b>${kills}</b></span><span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
@@ -4765,7 +4813,7 @@ window.__game = {
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.delete(dir); },
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
-  hurtPlayer, startReload, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy,
+  hurtPlayer, startReload, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy, gameOver, sadTrombone,
   debugSetKills(n){ kills = n; },
   debugSetState(s){ state = s; }
 };
