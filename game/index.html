@@ -84,7 +84,7 @@
   .upd li{font-size:12px;color:#b9c4ce;line-height:1.35}
   /* большой баннер обновления */
   .bigBanner{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;
-    gap:2px;margin:12px auto 4px;padding:10px 34px;border:none;border-radius:14px;cursor:pointer;
+    gap:2px;margin:16px auto 22px;padding:10px 34px;border:none;border-radius:14px;cursor:pointer;
     width:min(560px,92vw);box-sizing:border-box;
     background:linear-gradient(100deg,#c8e84a,#9ee02a 35%,#ffe066 70%,#c8e84a);
     color:#10160c;box-shadow:0 0 26px rgba(182,212,58,.55),0 6px 22px rgba(0,0,0,.45);
@@ -186,7 +186,8 @@
   @media (max-width:640px){
     #devs .panel{background:rgba(10,14,9,.86)}
     /* на телефоне плашка компактнее и без «свечения», иначе текст слепнет */
-    .bigBanner{padding:7px 10px;border-radius:12px;gap:1px;box-shadow:0 2px 10px rgba(0,0,0,.5);
+    .bigBanner{padding:7px 10px;border-radius:12px;gap:1px;margin:12px auto 16px;
+      box-shadow:0 2px 10px rgba(0,0,0,.5);
       animation:none;background:linear-gradient(100deg,#d6ef62,#a6e42e 45%,#ffe680)}
     .bigBanner .bb-shine{display:none}
     .bigBanner .bb-title{font-size:clamp(13px,4.6vw,17px);letter-spacing:.05em;animation:none;
@@ -279,7 +280,7 @@
   <button id="bigBanner" class="bigBanner hidden">
     <span class="bb-shine"></span>
     <span class="bb-title">✨ БОЛЬШОЕ ОБНОВЛЕНИЕ ✨</span>
-    <span class="bb-sub"><span class="bb-ver">v1.30.0 · 36 уровней · 9 боссов · </span>СМОТРЕТЬ ИЗМЕНЕНИЯ ▸</span>
+    <span class="bb-sub"><span class="bb-ver" id="bbVer">v1.30.1 · 36 уровней · 9 боссов · </span>СМОТРЕТЬ ИЗМЕНЕНИЯ ▸</span>
   </button>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
   <div class="btns">
@@ -492,7 +493,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.30.0 (17.11)';
+const VERSION = 'v1.30.1 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -2026,6 +2027,8 @@ function refreshMenu(){
     $('btnContinue').textContent = 'Продолжить (уровень ' + (run.lvl + 1) + ')';
     $('btnNewRun').textContent = 'Начать заново';
   }
+  const bbv = $('bbVer');
+  if (bbv) bbv.textContent = VERSION.split(' ')[0] + ' · 36 уровней · 9 боссов · ';
   $('bigBanner').classList.toggle('hidden', !BIG_UPDATE);
 }
 function spentOnUpgrades(){
@@ -2126,20 +2129,27 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.30.1', items:[
+    'Плашка про обновление больше не наезжает на строку с золотом и рекордом — особенно на телефоне.',
+    'Тексты обновлений переписаны по-человечески: теперь понятно, что изменилось в игре, а не в коде.'
+  ]},
   {v:'v1.30.0', big:true, items:[
-    '36 уровней и 9 биомов, босс каждые четыре уровня.',
-    'Физика героя: инерция, лёд, вода, лава.',
-    'Элитные враги шести видов, декор биомов.',
-    'Новые боссы: Лавовый червь, Кристальный голем, Ледяная королева.',
-    'Финал: четыре фазы Скелета-владыки, восемь прежних боссов волнами, метание кос.',
-    'Бестиарий с биомами, тьма Бездны и прицел только по видимым врагам.',
-    'Продолжение забега: игра запоминает уровень и прокачку.'
+    'Уровней стало больше: 36 вместо 30 — девять биомов по четыре уровня, в конце каждого биома свой босс.',
+    'Пол стал живым: на льду героя заносит, в воде он вязнет, лава жжёт — но не сразу, есть 0,3 секунды, чтобы сойти.',
+    'Появились элитные враги: толще обычных, злее, и при смерти каждый подкидывает сюрприз.',
+    'Три новых босса: Лавовый червь — ныряет под героя; Кристальный голем — держит стойку и открывает трещины; Ледяная королева — осколки, лёд под ногами и стены-укрытия.',
+    'Финал переделан: Скелет-владыка дерётся в четыре захода и каждый раз поднимает по два старых босса. После победы остаётся его трон.',
+    'В меню появился бестиарий: видно, какие биомы уже открыты, кто в них живёт и чем опасен.',
+    'Бездна стала страшнее: вокруг героя темнота, и автоприцел работает только по тем врагам, кого видно на экране.',
+    'Забег запоминается — можно закрыть игру и продолжить с того же уровня с той же прокачкой.',
+    'Этот экран тоже новый: теперь обновления можно читать прямо в игре.'
   ]},
   {v:'v1.29.1', items:[
-    'Магазин до 10 уровней, цепочка оружия, «Погружения».',
-    'Починен рендер героя на Паучихе и Скелете-владыке.'
+    'Магазин можно прокачивать до 10 уровней, оружие открывается по цепочке.',
+    'Появились «Погружения» — новый круг сложности для тех, кто всё прокачал.',
+    'Починен герой на Паучихе и Скелете-владыке.'
   ]},
-  {v:'v1.21.0 и ранее', items:['Базовые механики: уровни, магазин, барабан, рекорды.']}
+  {v:'v1.21.0 и ранее', items:['Первая версия: уровни, магазин, барабан с улучшениями, рекорды.']}
 ];
 
 function refreshUpdates(){
