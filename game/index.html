@@ -352,6 +352,7 @@
   <div class="panel" style="max-width:700px">
     <h2 id="drumTitle">Барабан</h2>
     <p id="drumSub">Крути и забирай</p>
+    <div class="goldbar"><span id="drumGold">Золото: 0</span></div>
     <div class="reelWrap"><div class="strip" id="strip"></div><div id="drumFlash"></div></div>
     <div id="drumResult">
       <div class="resTitle" id="resName">—</div>
@@ -406,7 +407,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.28.0 (16.11)';
+const VERSION = 'v1.29.0 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1019,8 +1020,8 @@ const ITEMS = [
   {id:'crit',   r:'rare',   ic:'✷', name:'Критический удар',  desc:'+15% шанс урона ×2.5', max:5, apply:p=>p.crit+=.15},
   {id:'armor',  r:'rare',   ic:'⛊', name:'Броня',             desc:'На 15% меньше урона по тебе', max:4, apply:p=>p.armor+=.15},
   {id:'magnet', r:'rare',   ic:'◎', name:'Магнит опыта',      desc:'+40% опыта с врагов', max:4, apply:p=>p.xpMul+=.4},
-  {id:'regen',  r:'rare',   ic:'✚', name:'Регенерация',       desc:'+1 HP в секунду', max:4, apply:p=>p.regen+=1},
-  {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+3 HP за каждое убийство', max:3, apply:p=>p.vamp+=3},
+  {id:'regen',  r:'rare',   ic:'✚', name:'Регенерация',       desc:'+0.5 HP в секунду', max:4, apply:p=>p.regen+=0.5},
+  {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+1.5% макс. HP за убийство', max:3, apply:p=>p.vamp+=0.015},
   {id:'slow',   r:'rare',   ic:'❄', name:'Замедление',        desc:'Попадания замедляют врага сильнее с уровнем', max:2, apply:p=>p.slow+=1},
   {id:'fastreload', r:'rare', ic:'⟳', name:'Быстрая перезарядка', desc:'Перезарядка быстрее на 20%', max:3, apply:p=>p.reloadMul*=0.8},
   {id:'bigmag', r:'epic',   ic:'▭', name:'Расширенный магазин', desc:'+40% патронов в магазине', max:2, apply:p=>p.magMul*=1.4},
@@ -1046,7 +1047,7 @@ const ARTIFACTS = [
   {id:'a_prism', ic:'↺', name:'Призма',         desc:'Рикошет и пробитие +1',          apply:p=>{p.ricochet=true;p.pierce+=1;}},
   {id:'a_eye',   ic:'➹', name:'Глаз пещеры',    desc:'Сильное наведение и пробитие +1',apply:p=>{p.homing+=3;p.pierce+=1;}},
   {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+30% скорость, паутина не держит',apply:p=>{p.speed*=1.3;p.webImmune=true;}},
-  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+8 HP за убийство и +10% урон',  apply:p=>{p.vamp+=8;p.dmgMul*=1.1;}},
+  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+6% макс. HP за убийство и +10% урон',  apply:p=>{p.vamp+=0.06;p.dmgMul*=1.1;}},
   {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+3 орбиты, урон орбит вдвое',    apply:p=>{p.orbs+=3;p.orbMul*=2;}},
   {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Сильный ядовитый шлейф за спиной',apply:p=>p.gasTrail=true},
   {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка ×0.4 и +50% магазин',apply:p=>{p.reloadMul*=0.4;p.magMul*=1.5;}},
@@ -1083,7 +1084,7 @@ function resetGame(){
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
        shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
-       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0,
+       gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0, wound:0,
        projMul:1, webImmune:false, orbMul:1};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
@@ -1192,7 +1193,7 @@ function spawnEnemy(type, near){
   enemies.push({
     x:pos.x, y:pos.y, type, t:0, r:b.r, scale:b.scale,
     hp:b.hp*mul*tierHp()*ramp, maxHp:b.hp*mul*tierHp()*ramp, speed:b.speed*L.speed,
-    dmg:b.dmg*tierDmg()*ramp, xp:b.xp, flash:0, phase:Math.random()*6.28, cd:1+Math.random()*2,
+    dmg:b.dmg*tierDmg()*ramp*(1 + 0.04*lvl), xp:b.xp*(1 + 0.15*lvl), flash:0, phase:Math.random()*6.28, cd:1+Math.random()*2,
     slowT:0, poisonT:0, poisonDmg:0, boss:false, orbHit:0, kvx:0, kvy:0,
     idle:0, lastX:pos.x, lastY:pos.y
   });
@@ -1205,7 +1206,8 @@ function spawnBossAt(kind, name, x, y, phase, hpScale){
   let hp = 500 * (1 + lvl*0.18) * 3 * (hpScale || 1) * tierHp();
   bossRef = {
     x, y, type:'boss', bossKind:kind, name:name||'Босс', t:0, phase: phase || 0,
-    r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48*tierDmg(), xp:150,
+    r:26, scale:112, hp, maxHp:hp, speed:58*(1+lvl*0.02), dmg:48*tierDmg()*(1 + 0.04*lvl),
+    xp: Math.round(300 * (1 + 0.15*lvl)),
     flash:0, phaseT:0, cd:1.5, dashT:0, windT:0, dashVX:0, dashVY:0, chargeFatigue:1,
     slowT:0, poisonT:0, poisonDmg:0, boss:true, orbHit:0,
     cocoon:false, wave:0, waitT:0
@@ -1262,10 +1264,16 @@ function openDrum(){
   drumOpen = true;
   $('drumTitle').textContent = 'Барабан · уровень ' + plvl;
   $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
+  refreshDrumGold();
   show('drum');
   spinReel();
 }
 function rerollCost(){ return 20 + rerolls*15; }
+function refreshDrumGold(){
+  const c = rerollCost(), enough = meta.gold >= c;
+  $('drumGold').innerHTML = `Золото: <b>${meta.gold}</b> · перекрут <b style="color:${enough ? '#ffb340' : '#c0392b'}">${c}</b>` +
+    (enough ? '' : ' <small style="color:#c0392b">не хватает ' + (c - meta.gold) + '</small>');
+}
 
 function spinReel(){
   if (reelAnimating) return;
@@ -1388,6 +1396,7 @@ $('btnReroll').onclick = () => {
   if (meta.gold < c) return;
   meta.gold -= c; saveMeta(); rerolls++;
   $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
+  refreshDrumGold();
   spinReel();
 };
 
@@ -1954,7 +1963,8 @@ function update(dt){
   }
   if (P.iframe > 0) P.iframe -= dt;
   if (tutorial) P.hp = P.maxHp;
-  if (P.regen) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
+  if (P.wound > 0) P.wound -= dt;
+  if (P.regen && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
   if (P.shieldMax && P.shield < P.shieldMax){ P.shieldT += dt; if (P.shieldT >= Math.max(6, 12 - 2*P.shieldMax)){ P.shieldT = 0; P.shield++; } }
   if (toastT > 0) toastT -= dt;
 
@@ -2189,7 +2199,7 @@ function update(dt){
       enemies.splice(i,1);
       kills++;
       addGold(1 + lvl*.4);
-      if (P.vamp) P.hp = Math.min(P.maxHp, P.hp + P.vamp);
+      if (P.vamp && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.vamp*P.maxHp);
       gainXp(Math.round(en.xp * P.xpMul));
       parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
       if (en.poisonT > 0){
@@ -2420,6 +2430,7 @@ function hurtPlayer(dmg){
   if (P.shield > 0){ P.shield--; P.iframe = .4; parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'}); return; }
   P.hp -= dmg*(1-Math.min(.8,P.armor));
   P.iframe = .7;
+  P.wound = 3;                       // «рана»: реген и вампиризм молчат 3 с
   parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'});
   parts.push({x:P.x,y:P.y,life:.35,max:.35,kind:'shock',size:130});
   // ударная волна: отталкиваем врагов вокруг
@@ -2448,7 +2459,7 @@ function gainXp(n){
   if (tutorial && (!TUT[tutIdx] || TUT[tutIdx].kind !== 'level')) return;
   xp += n * (1 + 0.10*TIER());
   if (xp >= xpNeed){
-    xp -= xpNeed; plvl++; xpNeed = Math.round(xpNeed*1.42);
+    xp -= xpNeed; plvl++; xpNeed = Math.round(xpNeed*1.32);
     openDrum();
   }
 }
@@ -2459,14 +2470,15 @@ function enterPortal(){
   addGold(12 + lvl*3);
   meta.best = Math.max(meta.best, lvl+1);
   saveMeta();
-  const L = LEVELS[lvl];
+  const L = LEVELS[lvl], next = LEVELS[lvl+1];
   $('endTitle').textContent = `Уровень ${lvl+1} пройден`;
-  $('endSub').textContent = `${L.biomeName} · ${L.mod.name}`;
+  $('endSub').textContent = `${L.biomeName} · ${L.mod.name}` +
+    (next && next.boss ? ` · дальше БОСС · ${next.bossName}` : '');
   $('endStats').innerHTML =
     `<span>Убито: <b>${kills}</b></span><span>Время: <b>${Math.round(levelTime)}с</b></span>` +
     `<span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
   $('nameBox').style.display = 'none';
-  $('btnNext').textContent = (lvl+1 >= TOT) ? 'Финал' : ((lvl+1) % 5 === 0 ? 'Босс!' : 'Дальше');
+  $('btnNext').textContent = !next ? 'Финал' : next.boss ? 'К боссу!' : 'Дальше';
   show('levelend');
   stopMusic();
   showHud(false);
@@ -3072,7 +3084,7 @@ window.__game = {
   get clouds(){ return clouds; }, get webs(){ return webs; }, get graves(){ return graves; }, get stacks(){ return stacks; }, get pendingSkel(){ return pendingSkel; }, get musicMode(){ return MUSIC.mode; },
   get mode(){ return mode; }, get cam(){ return cam; }, get tutorial(){ return tutorial; }, get W(){ return W; }, get H(){ return H; }, get layoutMode(){ return layoutMode; },
   musicWatchdog, stopMusicTrack, get musicTrack(){ return musicTrackName; }, get wantTrack(){ return wantedTrack; },
-  startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS,
+  startGame, startLevel, update, render, canStand, LEVELS, TOT, MODS, BIOMES, WEAPONS, WEAPON_ORDER, ITEMS, ARTIFACTS, enterPortal,
   setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
   get lastSpin(){ return lastSpin; },
   keyDown(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
