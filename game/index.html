@@ -407,7 +407,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.29.0 (17.11)';
+const VERSION = 'v1.29.1 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1650,21 +1650,34 @@ function refreshShop(){
   refreshPrestige();
 }
 
+let prestigeArmed = false;
 function refreshPrestige(){
   const box = $('prestigeBox'); if (!box) return;
   const T = TIER(), ready = canPrestige();
   const upDone = META_UP.filter(u => upLvl(u.id) >= u.max).length, wpDone = WEAPON_ORDER.filter(id => meta.unlocked[id]).length;
+  const label = ready ? (prestigeArmed ? `Точно? Слой ${T+1}` : 'Вглубь') : 'ЗАКРЫТО';
   box.innerHTML = `<div class="row"><div class="nm"><b>Погружение ${T}</b>
-    <small>${ready ? `всё прокачано — можно уйти на слой ${T+1}: враги крепче, добыча богаче` : `макс. улучшений ${upDone}/${META_UP.length} · оружия ${wpDone}/${WEAPON_ORDER.length}`}</small></div>
-    <div><button class="small" ${ready?'':'disabled'}>${ready?'Вглубь':'ЗАКРЫТО'}</button></div></div>`;
-  if (ready) box.querySelector('button').onclick = prestige;
+    <small>${ready
+      ? (prestigeArmed
+          ? `нажми ещё раз: золото, улучшения и оружие обнулятся, враги станут крепче`
+          : `всё прокачано — можно уйти на слой ${T+1} (сколько угодно раз)`)
+      : `макс. улучшений ${upDone}/${META_UP.length} · оружия ${wpDone}/${WEAPON_ORDER.length}`}</small></div>
+    <div><button class="small" ${ready?'':'disabled'}>${label}</button></div></div>`;
 }
+// обработчик на контейнере: не теряется при перерисовке магазина
+$('prestigeBox').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button');
+  if (!b || b.disabled || !canPrestige()) return;
+  if (!prestigeArmed){ prestigeArmed = true; sfx('click'); refreshPrestige(); return; }
+  prestige();
+});
 
 function prestige(){
   const T = TIER() + 1;
-  if (!confirm(`Начать погружение ${T}?\n\nВсё обнулится: золото, улучшения, оружие.\nВраги: +30% HP, +25% урона.\nДобыча: +25% золота, +10% опыта, +150 золота на старте забега.`)) return;
   meta.tier = T;
   meta.gold = 0; meta.up = {}; meta.unlocked = {pistol:true}; meta.weapon = 'pistol';
+  prestigeArmed = false;
+  sfx('levelup');
   saveMeta(); refreshShop(); refreshMenu();
 }
 function refreshRecords(){
