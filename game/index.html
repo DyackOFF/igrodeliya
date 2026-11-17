@@ -43,7 +43,7 @@
   .tag{color:var(--dim);letter-spacing:.2em;text-transform:uppercase;font-size:10px;margin-bottom:10px}
   .credits{color:var(--amber);font-size:13.5px;letter-spacing:.04em;margin:0 0 12px;opacity:.92}
 
-  .btns{display:flex;flex-direction:column;gap:7px;width:min(300px,84vw)}
+  .btns{display:flex;flex-direction:column;gap:7px;width:min(300px,84vw);flex:0 0 auto}
   button{font:inherit;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;
     padding:11px 15px;border-radius:10px;cursor:pointer;color:var(--txt);
     background:linear-gradient(160deg,#22301a,#151d12);border:1px solid #3a4a26;transition:.15s}
@@ -84,6 +84,7 @@
   .upd li{font-size:12px;color:#b9c4ce;line-height:1.35}
   /* большой баннер обновления */
   .bigBanner{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;
+    flex:0 0 auto;   /* иначе на низком экране плашку сжимает и текст обрезается */
     gap:2px;margin:16px auto 22px;padding:10px 34px;border:none;border-radius:14px;cursor:pointer;
     width:min(560px,92vw);box-sizing:border-box;
     background:linear-gradient(100deg,#c8e84a,#9ee02a 35%,#ffe066 70%,#c8e84a);
@@ -183,8 +184,7 @@
   .devfaces{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1}
   .devfaces img{position:absolute;top:0;height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.55))}
   /* на телефоне панель почти во весь экран — делаем её чуть прозрачной, чтобы лица были видны */
-  @media (max-width:640px){
-    #devs .panel{background:rgba(10,14,9,.86)}
+  @media (max-width:640px){    #devs .panel{background:rgba(10,14,9,.86)}
     /* на телефоне плашка компактнее и без «свечения», иначе текст слепнет */
     .bigBanner{padding:7px 10px;border-radius:12px;gap:1px;margin:12px auto 16px;
       box-shadow:0 2px 10px rgba(0,0,0,.5);
@@ -194,6 +194,11 @@
       text-shadow:0 1px 0 rgba(255,255,255,.7)}
     .bigBanner .bb-sub{font-size:10px;letter-spacing:.03em;line-height:1.35;text-align:center}
     .bigBanner .bb-ver{display:none}
+  }
+  /* низкий экран (телефон в портрете): меню сверху и со скроллом, плашку не сжимаем */
+  @media (max-height:780px){
+    #menu{justify-content:flex-start;padding-top:14px;padding-bottom:16px}
+    .logo{height:min(84px,11vh)}
   }
   .rollBtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
@@ -493,7 +498,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.30.1 (17.11)';
+const VERSION = 'v1.30.2 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -2129,6 +2134,9 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.30.2', items:[
+    'На невысоких экранах (телефон в портрете) плашка про обновление больше не сплющивается — текст виден целиком, меню аккуратно прокручивается.'
+  ]},
   {v:'v1.30.1', items:[
     'Плашка про обновление больше не наезжает на строку с золотом и рекордом — особенно на телефоне.',
     'Тексты обновлений переписаны по-человечески: теперь понятно, что изменилось в игре, а не в коде.'
