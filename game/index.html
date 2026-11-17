@@ -501,7 +501,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.31.0 (17.11)';
+const VERSION = 'v1.31.1 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1435,6 +1435,9 @@ function resetGame(){
   bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; webs=[]; graves=[];
   lvl=0; kills=0; levelTime=0; xp=0; xpNeed=20; plvl=1; stacks={}; bossRef=null; portal=null;
   toast=''; toastT=0; quota=0; spawnTimer=1; flow=null; flowT=0;
+  // всё, что появилось в большом обновлении: нужно и уровню, и обучению
+  surf=null; decor=null;
+  iceTiles=[]; iceWalls=[]; scythes=[]; throne=null; winDelay=0; eliteLeft=0;
 }
 
 function startLevel(i){
@@ -2145,6 +2148,9 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.31.1', items:[
+    'Починил обучение: после большого обновления оно падало на первом же уроке, теперь все шесть уроков проходятся.'
+  ]},
   {v:'v1.31.0', items:[
     'Прогресс обнулён у всех и на всех устройствах: золото, покупки в магазине, открытое оружие, рекорды и сохранённый забег начинаются с нуля.',
     'Так надо: обновление слишком большое, старые сохранения к нему не подходят. Дальше прогресс снова копится как обычно.',
