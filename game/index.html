@@ -501,7 +501,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.31.2 (17.11)';
+const VERSION = 'v1.31.3 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1473,6 +1473,22 @@ function resetGame(){
   iceTiles=[]; iceWalls=[]; scythes=[]; throne=null; winDelay=0; eliteLeft=0;
 }
 
+// ближайшая проходимая точка: страховка от спавна в стене
+function freeSpotNear(x, y, r){
+  if (!solidPx(x, y) && canStand(x, y, r)) return {x, y};
+  const tx = Math.floor(x/TS), ty = Math.floor(y/TS);
+  for (let rad = 1; rad <= 14; rad++){
+    for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++){
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
+      const nx = tx + dx, ny = ty + dy;
+      if (nx < 1 || ny < 1 || nx >= MAP_W-1 || ny >= MAP_H-1) continue;
+      const px = nx*TS + TS/2, py = ny*TS + TS/2;
+      if (!solidPx(px, py) && canStand(px, py, r)) return {x:px, y:py};
+    }
+  }
+  return {x, y};
+}
+
 function startLevel(i){
   lvl = i;
   const L = LEVELS[i];
@@ -1483,6 +1499,9 @@ function startLevel(i){
   eliteLeft = 0;
   eliteLeft = eliteBudget();
   P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
+  // страховка: герой никогда не должен появиться внутри стены
+  const sp0 = freeSpotNear(P.x, P.y, 13);
+  P.x = sp0.x; P.y = sp0.y;
   P.vx = 0; P.vy = 0; P.lavaT = 0;
   cam = {x:0,y:0};
   bullets=[]; ebullets=[]; enemies=[]; parts=[]; clouds=[]; webs=[]; graves=[]; bossRef=null; portal=null; throne=null;
@@ -2192,6 +2211,9 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.31.3', items:[
+    'Добавил страховку от спавна в текстурах: если герой всё-таки окажется в стене, его сразу выталкивает на свободный пол.'
+  ]},
   {v:'v1.31.2', items:[
     'На экране смерти теперь играет грустный тромбон.',
     'Исправлен ввод имени: раньше WASD листали меню и буквы не печатались — теперь в поле имени спокойно набирается текст.'
@@ -2645,6 +2667,8 @@ function startTutLesson(i){
   MAP_W = 22; MAP_H = 15;
   surf = null; decor = null;
   P.x = (MAP_W>>1)*TS + TS/2; P.y = (MAP_H>>1)*TS + TS/2;
+  const tsp = freeSpotNear(P.x, P.y, 13);
+  P.x = tsp.x; P.y = tsp.y;
   cam = {x:0, y:0};
   quota = cfg.need || 0; kills = 0; levelTime = 0;
   bullets = []; ebullets = []; enemies = []; parts = []; clouds = []; portal = null; bossRef = null;
@@ -2782,6 +2806,13 @@ function update(dt){
     P.lavaT = (P.lavaT || 0) + dt;
     if (P.lavaT > .3){ P.hp -= 8*dt; if (P.hp <= 0) gameOver(); }
   } else P.lavaT = 0;
+
+  // страховка: если герой каким-то образом оказался в стене — выталкиваем на свободный пол
+  if (solidPx(P.x, P.y)){
+    const fs = freeSpotNear(P.x, P.y, 13);
+    P.x = fs.x; P.y = fs.y; P.vx = 0; P.vy = 0;
+    parts.push({x:P.x, y:P.y, life:.45, max:.45, kind:'tp', size:44});
+  }
   cam.x = clamp(P.x-W/2, 0, MAP_W*TS-W);
   cam.y = clamp(P.y-H/2, 0, MAP_H*TS-H);
 
