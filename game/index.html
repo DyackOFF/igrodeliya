@@ -129,6 +129,8 @@
   .stats{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;color:var(--dim);font-size:12px;margin-bottom:10px}
   .stats b{color:var(--lime)}
   .goldbar{display:flex;gap:14px;justify-content:center;color:var(--amber);font-size:13px;letter-spacing:.05em;margin-bottom:8px}
+  .wipeNote{font-size:11px;color:#ffb340;letter-spacing:.04em;margin:-4px 0 8px;opacity:.92}
+  .wipeNote.hidden{display:none}
 
   /* барабан */
   .reelWrap{position:relative;width:100%;max-width:680px;overflow:hidden;
@@ -288,6 +290,7 @@
     <span class="bb-sub"><span class="bb-ver" id="bbVer">v1.30.1 · 36 уровней · 9 боссов · </span>СМОТРЕТЬ ИЗМЕНЕНИЯ ▸</span>
   </button>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
+  <div id="wipeNote" class="wipeNote hidden">Прогресс сброшен под большое обновление</div>
   <div class="btns">
     <button class="primary" id="btnPlay">Играть</button>
     <button class="primary hidden" id="btnContinue">Продолжить</button>
@@ -498,7 +501,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.30.2 (17.11)';
+const VERSION = 'v1.31.0 (17.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -921,14 +924,21 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
   return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 // ================= МЕТА =================
-const META_KEY = 'crazy_mountaine_meta_v2';
+const META_KEY = 'crazy_mountaine_meta_v3';
+// вайп прогресса под большое обновление: старые ключи удаляем, игру начинаем с нуля
+const OLD_KEYS = ['crazy_mountaine_meta_v2', 'crazy_mountaine_meta_v1', 'crazy_mountaine_run_v1'];
+let wipeNotice = false;
+try {
+  wipeNotice = !!localStorage.getItem('crazy_mountaine_meta_v2');
+  OLD_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+} catch(e){}
 let meta = {gold:0, up:{}, unlocked:{pistol:true}, weapon:'pistol', records:[], best:0, tier:0, sound:1, shotSound:1, uiSound:1, vol:60, music:1, musicVol:35, layout:'auto'};
 try { const raw = localStorage.getItem(META_KEY); if (raw) meta = Object.assign(meta, JSON.parse(raw)); } catch(e){}
 layoutMode = meta.layout || 'auto';
 function saveMeta(){ try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch(e){} }
 
 // ===== сохранение забега (продолжить с уровня) =====
-const SAVE_KEY = 'crazy_mountaine_run_v1', SAVE_V = 1;
+const SAVE_KEY = 'crazy_mountaine_run_v2', SAVE_V = 1;
 let memRun = null;                       // запасной сейв, если localStorage недоступен
 function loadRun(){
   try {
@@ -2035,6 +2045,7 @@ function refreshMenu(){
   const bbv = $('bbVer');
   if (bbv) bbv.textContent = VERSION.split(' ')[0] + ' · 36 уровней · 9 боссов · ';
   $('bigBanner').classList.toggle('hidden', !BIG_UPDATE);
+  $('wipeNote').classList.toggle('hidden', !wipeNotice);
 }
 function spentOnUpgrades(){
   let sum = 0;
@@ -2134,6 +2145,11 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.31.0', items:[
+    'Прогресс обнулён у всех и на всех устройствах: золото, покупки в магазине, открытое оружие, рекорды и сохранённый забег начинаются с нуля.',
+    'Так надо: обновление слишком большое, старые сохранения к нему не подходят. Дальше прогресс снова копится как обычно.',
+    'Если в меню видишь пометку «Прогресс сброшен» — это про этот сброс, она пропадёт после первого запуска.'
+  ]},
   {v:'v1.30.2', items:[
     'На невысоких экранах (телефон в портрете) плашка про обновление больше не сплющивается — текст виден целиком, меню аккуратно прокручивается.'
   ]},
@@ -2624,6 +2640,7 @@ $('btnTutorial').onclick = () => { sfx('click'); startTutorial(); };
 
 function startGame(){
   tutorial = false; tutIdx = 0;
+  wipeNotice = false;
   meta.gold += 150*TIER();
   resetGame();
   $('btnNext').onclick = () => nextLevel();
