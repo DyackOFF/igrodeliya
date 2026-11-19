@@ -1442,18 +1442,25 @@ const ELITES = {
   sniper: {name:'Снайпер',   color:'#8ef0ff', hp:3.5, speed:.8,   base:'spitter'}
 };
 // урон элиты — доля сверх обычного моба
-const ELITE_DMG = 1.35;
+const ELITE_DMG = 1.7;
+const ELITE_RESIST = .2;                 // входящий урон по элите −20%
 const eliteFor = type => Object.keys(ELITES).find(k => ELITES[k].base === type);
 
-// 0–2 элиты на уровень: с 6-го уровня, «Тяжёлые» +1, «Стая» — без элит, на боссах только со слоя 2
+let shakeT = 0, shakeMag = 0;
+function shakeScreen(t, m){ shakeT = Math.max(shakeT, t || .2); shakeMag = Math.max(shakeMag, m || 6); }
+
+// HP главного босса уровня: линейный рост + надбавка после 8-го (у игрока ДПС растёт быстрее)
+function bossHpFor(l){
+  const late = 1 + Math.max(0, l - 8) * 0.11;
+  return 500 * (1 + l*0.18) * 3 * Math.max(1, late) * tierHp();
+}
+// 1 элита на уровень: с 6-го, «Тяжёлые» +1, «Стая» — без элит, на боссах только со слоя 2
 function eliteBudget(){
   const L = LEVELS[lvl];
   if (lvl < 5) return 0;
   if (L.mod && L.mod.id === 'horde') return 0;
   if (L.boss && TIER() < 2) return 0;
-  let n = Math.floor(Math.random()*3);
-  if (L.mod && L.mod.id === 'tanks') n += 1;
-  return n;
+  return (L.mod && L.mod.id === 'tanks') ? 2 : 1;
 }
 
 // ================= СОСТОЯНИЕ =================
@@ -1653,12 +1660,16 @@ function spawnEnemy(type, near, allowElite){
     eliteLeft--;
     const el = ELITES[id];
     e.elite = id;
-    e.hp = e.maxHp = e.maxHp * el.hp;
+    // элита — мини-босс: HP считаем от босса уровня, а не от моба
+    const eHp = bossHpFor(lvl) * Math.min(.22, .10 + .004*lvl);
+    e.hp = e.maxHp = Math.max(e.maxHp * 2, eHp);
     e.speed *= el.speed;
     e.dmg *= ELITE_DMG;
+    e.armorElite = ELITE_RESIST;
     e.xp *= 4;
     e.gold = 3;
-    e.scale *= 1.2;
+    e.scale *= 1.28;
+    shakeScreen(.22, 7);
     toast = 'ЭЛИТА · ' + el.name; toastT = 2.5;
     sfx('portal');
     parts.push({x:e.x, y:e.y, life:.5, max:.5, kind:'tp', size:e.scale});
@@ -1671,9 +1682,9 @@ function spawnBoss(kind, name){
   spawnBossAt(kind, name, pos.x, pos.y, 0, 1);
 }
 function spawnBossAt(kind, name, x, y, phase, hpScale, isMain){
-  let hp = 500 * (1 + lvl*0.18) * 3 * (hpScale || 1) * tierHp();
+  let hp = bossHpFor(lvl) * (hpScale || 1);
   // у финального босса четыре фазы: HP делится между ними, иначе бой длится вечность
-  if (kind === 'skelord') hp *= 0.4;
+  if (kind === 'skelord') hp *= 0.32;
   const bio = BIOMES[LEVELS[lvl].biome] || {};
   const art = bio.art || 'king';
   const b = {
@@ -2235,7 +2246,6 @@ function refreshRecords(){
 const BIG_UPDATE = true;
 const CHANGELOG = [
   {v:'v1.4.0', big:true, title:'Бафы и нерфы', items:[
-    'Элиты больше не картон: HP ×3.5–4 от базы и +35% урона, у Охотника рывок дольше держит телеграф.',
     'Отталкивание понерфил: толчок больше не складывается с каждой пулей, потолок 220 — дробовик и миниган не уносят мобов с экрана.',
     'Вампиризм: +1% за стак, стаков теперь 5. «Кровавый камень» — +5% вместо +6%.',
     '«Шипы» стали «Шипастой бронёй»: −10% урона в ближнем бою, а коснувшийся враг отлетает и замирает на 1 с (кроме боссов).',
@@ -2251,6 +2261,9 @@ const CHANGELOG = [
     'Отравленного врага теперь видно: зелёный ореол и пузырьки.',
     'Части распадающихся мобов больше не идут в счётчик уровня: раньше пара «распадающихся» закрывала квоту забега.',
     'Щит стало видно: сердце и HP в одной панели, под полоской — заряды щита с полоской восстановления, а вокруг героя светится купол (и вспыхивает, когда щит гасит удар).',
+    'Элиты стали мини-боссами: HP считается от босса уровня (10–22%), −20% входящего урона, урон ×1.7, над головой имя и своя полоса HP, при появлении трясётся экран. На уровень — одна элита (две на «Тяжёлых»).',
+    'Боссы стали крепче: после 8-го уровня HP растёт быстрее, у всех появилась вторая фаза «ЯРОСТЬ» (быстрее, злее, чаще бьёт), а раз за бой — щит на 2 с с подмогой. На полосе HP теперь видны деления фаз.',
+    'Добавил test-balance.js: он меряет, за сколько секунд умирают боссы и элиты, чтобы баланс не уезжал.',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
     'Главное меню собрано компактнее: Играть, Магазин, Обучение + две плитки — Бестиарий и Настройки. Рекорды теперь внутри бестиария, «Управление» — внутри настроек, а справа сверху появилась кнопка «на весь экран».',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
@@ -2785,6 +2798,7 @@ function startGame(){
 
 // ================= ОБНОВЛЕНИЕ =================
 function update(dt){
+  if (shakeT > 0){ shakeT -= dt; if (shakeT <= 0) shakeMag = 0; }
   levelTime += dt; P.t += dt;
   // перезарядка оружия
   if (P.ammoWeapon !== P.weapon){
@@ -2884,8 +2898,8 @@ function update(dt){
       const a = P.orbA + k*(Math.PI*2/P.orbs);
       const ox = P.x+Math.cos(a)*70, oy = P.y+Math.sin(a)*70;
       for (const en of enemies){
-        if (en.orbHit <= 0 && Math.hypot(en.x-ox, en.y-oy) < en.r+10){
-          en.hp -= 14*P.dmgMul*(P.orbMul||1); en.flash = .1; en.orbHit = .35;
+        if (en.orbHit <= 0 && en.inv <= 0 && Math.hypot(en.x-ox, en.y-oy) < en.r+10){
+          en.hp -= 14*P.dmgMul*(P.orbMul||1) * (en.armorElite ? 1 - en.armorElite : 1); en.flash = .1; en.orbHit = .35;
         }
       }
     }
@@ -2998,6 +3012,8 @@ function update(dt){
           }
           if (en.cracks) dmg *= 1.5;
         }
+        if (en.inv > 0) dmg = 0;
+        if (en.armorElite) dmg *= 1 - en.armorElite;
         en.hp -= dmg; en.flash = .12;
         if (P.slow) en.slowT = .8 + .4*P.slow;
         if (b.freeze) en.slowT = Math.max(en.slowT, 1.3);
@@ -3334,7 +3350,7 @@ function update(dt){
         // облака больше не суммируются: один тик на моба в 0.3 с, сколько бы их ни лежало
         if (en.cloudCd > 0) continue;
         if (Math.hypot(en.x-c.x, en.y-c.y) < c.r + en.r*.5){
-          en.hp -= c.dmg; en.flash = .1; en.cloudCd = .3;
+          en.hp -= c.dmg * (en.armorElite ? 1 - en.armorElite : 1); en.flash = .1; en.cloudCd = .3;
           en.poisonT = Math.max(en.poisonT, 1.2);
           en.poisonDmg = Math.max(en.poisonDmg, 3);
         }
@@ -3638,6 +3654,26 @@ function bossSkelord(en, dt, d, ux, uy, fx, fy, sp){
 
 function bossUpdate(en, dt, d, ux, uy, slowMul){
   en.cd -= dt;
+  // вторая фаза: ярость ниже половины HP
+  if (!en.rage && en.hp < en.maxHp*.5){
+    en.rage = 1; en.speed *= 1.15; en.dmg *= 1.3;
+    toast = 'ЯРОСТЬ · ' + (en.name || 'БОСС'); toastT = 2;
+    parts.push({x:en.x, y:en.y, life:.5, max:.5, kind:'shock', size:120});
+    shakeScreen(.3, 9); sfx('boom');
+  }
+  // щит-окно: раз за бой на 2 с становится неуязвим и зовёт подмогу
+  if (!en.shieldDone && en.hp < en.maxHp*.75){
+    en.shieldDone = 1; en.inv = 2;
+    for (let k = 0; k < 3; k++){
+      const a = Math.random()*6.28;
+      const enm = spawnEnemy(lvl > 20 ? 'skeleton' : 'slime', {x:en.x + Math.cos(a)*90, y:en.y + Math.sin(a)*90}, false);
+      enm.noQuota = true;
+    }
+    toast = 'ЩИТ · ' + (en.name || 'БОСС'); toastT = 2;
+    sfx('portal');
+  }
+  if (en.inv > 0) en.inv -= dt;
+  if (en.rage) en.cd -= dt*.35;            // в ярости атаки чаще
   const sp = en.speed*slowMul*(1 + 0.1 * Math.floor(levelTime / 30));
   // к герою идём по волновой карте, чтобы не застревать в стенах
   const tgt = flowTarget(en);
@@ -3768,7 +3804,9 @@ function hurtPlayer(dmg, melee){
 function explode(x,y,dmg,r,ignore){
   sfx('boom');
   parts.push({x,y,life:.3,max:.3,kind:'boom',size:r});
-  for (const en of enemies) if (en !== ignore && !en.cocoon && Math.hypot(en.x-x, en.y-y) < r+en.r){ en.hp -= dmg; en.flash = .12; }
+  for (const en of enemies) if (en !== ignore && !en.cocoon && en.inv <= 0 && Math.hypot(en.x-x, en.y-y) < r+en.r){
+    en.hp -= dmg * (en.armorElite ? 1 - en.armorElite : 1); en.flash = .12;
+  }
 }
 function addGold(n){
   meta.goldAcc = (meta.goldAcc || 0) + n * P.goldMul * 0.2 * tierLoot();
@@ -4357,6 +4395,9 @@ function drawQueenShape(g, t, scale, o){
 function render(){
   const L = LEVELS[lvl], B = BIOMES[L.biome];
   ctx.fillStyle = B.tint; ctx.fillRect(0,0,W,H);
+  const shx = shakeT > 0 ? (Math.random()-.5)*shakeMag*2 : 0;
+  const shy = shakeT > 0 ? (Math.random()-.5)*shakeMag*2 : 0;
+  ctx.save(); ctx.translate(shx, shy);
   const x0 = Math.floor(cam.x/TS), y0 = Math.floor(cam.y/TS);
   const x1 = Math.ceil((cam.x+W)/TS), y1 = Math.ceil((cam.y+H)/TS);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
@@ -4617,6 +4658,12 @@ function render(){
         ctx.beginPath(); ctx.arc(ex, ey, en.r + 6, en.face - .9, en.face + .9); ctx.stroke();
       }
     }
+    if (en.inv > 0){
+      ctx.globalAlpha = .35 + .25*Math.sin(en.t*10);
+      ctx.strokeStyle = '#8ef0ff'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(ex, ey, en.scale*.62, 0, 6.3); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     if (en.flash > 0){ ctx.globalAlpha=.55; ctx.fillStyle='#fff';
       ctx.beginPath(); ctx.arc(ex,ey,en.r*.8,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
     // отравление видно: зелёный ореол и пузырьки
@@ -4640,6 +4687,14 @@ function render(){
       ctx.fillStyle='#2a1a1a'; ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2, 5);
       ctx.fillStyle = en.elite ? ((ELITES[en.elite] || {}).color || '#b06bff') : '#c0392b';
       ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2*(en.hp/en.maxHp), 5);
+      if (en.elite){
+        const el = ELITES[en.elite] || {};
+        ctx.textAlign='center';
+        ctx.font = '700 ' + (W < 700 ? 9 : 10) + 'px "Segoe UI", sans-serif';
+        ctx.fillStyle = el.color || '#fff';
+        ctx.fillText(el.name, ex, ey - en.scale/2 - 16);
+        ctx.textAlign='left';
+      }
     }
   }
 
@@ -4896,6 +4951,7 @@ function drawWeaponArt(id){
     }
   }
 
+  ctx.restore();
   drawHud();
 }
 
@@ -4995,7 +5051,12 @@ function drawHud(){
     ctx.fillStyle='#3a1b1b'; ctx.fillRect(x2,y2,w2,12);
     ctx.fillStyle='#e8574a'; ctx.fillRect(x2,y2,w2*Math.max(0,bossRef.hp/bossRef.maxHp),12);
     ctx.textAlign='center'; ctx.fillStyle='#e2e9ef'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
-    ctx.fillText(bossRef.cocoon ? bossRef.name + ' · в коконе' : bossRef.name, W/2, y2-6);
+    // деления по фазам: 50% и 25%
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    ctx.fillRect(x2 + w2*.5 - 1, y2, 2, 12);
+    ctx.fillRect(x2 + w2*.25 - 1, y2, 2, 12);
+    const bst = bossRef.inv > 0 ? ' · НЕУЯЗВИМ' : bossRef.rage ? ' · ЯРОСТЬ' : '';
+    ctx.fillText((bossRef.cocoon ? bossRef.name + ' · в коконе' : bossRef.name) + bst, W/2, y2-6);
   } else if (pendingSkel){
     ctx.textAlign='center'; ctx.fillStyle='#e8574a'; ctx.font = '700 ' + fs2 + 'px "Segoe UI", sans-serif';
     ctx.fillText('Скелет-владыка воскреснет — добей слуг', W/2, H-52);
