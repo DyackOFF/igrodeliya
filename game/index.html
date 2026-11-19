@@ -11,10 +11,10 @@
     --c-common:#8b98a6; --c-rare:#4aa3ff; --c-epic:#b06bff; --c-art:#ffb340;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;touch-action:none;
+  html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;touch-action:manipulation;
     font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--txt);user-select:none}
   #wrap{position:fixed;inset:0;display:grid;place-items:center;background:#07080a}
-  canvas{image-rendering:pixelated;display:block;box-shadow:0 0 90px rgba(0,0,0,.9)}
+  canvas{image-rendering:pixelated;display:block;box-shadow:0 0 90px rgba(0,0,0,.9);touch-action:none}
 
   #hudbtns{position:fixed;right:10px;top:10px;z-index:6;display:none;gap:6px}
   #hudbtns.on{display:flex}
@@ -24,7 +24,8 @@
 
   .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:6px;background:radial-gradient(900px 600px at 50% 35%,#1a2b16 0%,#0b1008 55%,#07080a 100%);
-    z-index:5;text-align:center;padding:14px;overflow:auto}
+    z-index:5;text-align:center;overflow:auto;touch-action:pan-y;overscroll-behavior:contain;
+    padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom))}
   .screen.hidden{display:none}
   .logo{height:min(120px,14vh);cursor:pointer;filter:drop-shadow(0 8px 26px rgba(182,212,58,.25));
     transition:filter .2s, transform .2s}
@@ -54,7 +55,7 @@
   button.on{border-color:var(--lime);color:var(--lime);background:#16200f}
 
   .panel{z-index:2;background:rgba(10,14,9,.94);border:1px solid #2b3a20;border-radius:16px;
-    padding:18px;max-width:min(820px,95vw);width:100%;max-height:94vh;overflow-y:auto;overflow-x:hidden}
+    padding:18px;max-width:min(820px,95vw);width:100%;max-height:94vh;max-height:calc(100dvh - 28px);overflow-y:auto;overflow-x:hidden}
   .panel h2{margin:0 0 3px;font-size:clamp(17px,3vw,23px);letter-spacing:.1em;text-transform:uppercase}
   .panel p{margin:0 0 12px;color:var(--dim);font-size:13px}
 
@@ -286,7 +287,7 @@
   <div class="tag"><span id="verTag">v0.0</span> · 36 уровней · 9 боссов · гимназия им. Н.В. Пушкова</div>
   <button id="bigBanner" class="bigBanner hidden">
     <span class="bb-shine"></span>
-    <span class="bb-title">✨ БОЛЬШОЕ ОБНОВЛЕНИЕ ✨</span>
+    <span class="bb-title">⚖ БАФЫ И НЕРФЫ ⚖</span>
     <span class="bb-sub"><span class="bb-ver" id="bbVer">v1.30.1 · 36 уровней · 9 боссов · </span>СМОТРЕТЬ ИЗМЕНЕНИЯ ▸</span>
   </button>
   <div class="goldbar"><span id="menuGold">Золото: 0</span><span id="menuBest">Рекорд: —</span></div>
@@ -501,7 +502,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.31.4 (19.11)';
+const VERSION = 'v1.4.0 (19.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1047,7 +1048,7 @@ const BIOMES = [
   {name:'Верхние пещеры',      tint:'#101820', overlay:'rgba(80,120,160,0.10)',  boss:'Король слизней',    kind:'summon', art:'king'},
   {name:'Кристальный грот',    tint:'#121428', overlay:'rgba(120,90,230,0.12)',  boss:'Кристальный страж', kind:'shoot',  art:'guardian'},
   {name:'Глубины',             tint:'#1a1410', overlay:'rgba(170,120,60,0.10)',  boss:'Камнеед',           kind:'charge', art:'stoneater'},
-  {name:'Костяной зал',        tint:'#1c1414', overlay:'rgba(200,90,80,0.10)',   boss:'Костяной владыка',  kind:'summon', art:'boneking'},
+  {name:'Костяной зал',        tint:'#1c1414', overlay:'rgba(200,90,80,0.10)',   boss:'Костяной владыка',  kind:'boneking', art:'boneking'},
   {name:'Ледяные шахты',       tint:'#0b1620', overlay:'rgba(90,190,230,0.14)',  boss:'Паучиха',           kind:'cocoon', art:'spiderBoss'},
   {name:'Лавовые ходы',        tint:'#26100a', overlay:'rgba(255,110,40,0.14)',  boss:'Лавовый червь',     kind:'worm',   art:'worm'},
   {name:'Кристальные катакомбы',tint:'#141228',overlay:'rgba(150,110,255,0.12)', boss:'Кристальный голем', kind:'golem',  art:'golem'},
@@ -1305,7 +1306,7 @@ const WEAPONS = {
   minigun: {name:'Миниган',       note:'Огромный магазин, шквал пуль',           dmg:5,  delay:.055,speed:800, count:1, spread:.14, price:1200},
   sniper:  {name:'Снайперка',     note:'Высокий урон, пробивает 3 врагов',       dmg:48, delay:1.05,speed:1250,count:1, spread:0, pierce:3, price:1500},
   rocket:  {name:'Ракетница',     note:'Взрыв по площади',                      dmg:30, delay:.95, speed:440, count:1, spread:0, rocket:true, price:1800},
-  grenade: {name:'Гранатомёт',    note:'Сильный взрыв, большой радиус',          dmg:38, delay:1.15,speed:380, count:1, spread:.05, rocket:true, aoe:96, price:2200},
+  grenade: {name:'Гранатомёт',    note:'Граната: отскоки от стен, взрыв по касанию или фитилю', dmg:38, delay:1.15,speed:330, count:1, spread:.05, rocket:true, grenade:true, aoe:110, fuse:1.4, bounces:3, price:2200},
   plasma:  {name:'Плазмаган',     note:'Плотные сгустки, пробивают 2 врагов',    dmg:24, delay:.52, speed:620, count:1, spread:.03, pierce:2, price:3000},
   cryo:    {name:'Криопушка',     note:'Замедляет всех, в кого попала',          dmg:14, delay:.42, speed:700, count:1, spread:.06, freeze:true, price:3500},
   railgun: {name:'Рельса',        note:'Пробивает 8 врагов насквозь',            dmg:70, delay:1.30, speed:1600,count:1, spread:0, pierce:8, thin:true, price:4500},
@@ -1360,15 +1361,15 @@ const ITEMS = [
   {id:'armor',  r:'rare',   ic:'⛊', name:'Броня',             desc:'На 15% меньше урона по тебе', max:4, apply:p=>p.armor+=.15},
   {id:'magnet', r:'rare',   ic:'◎', name:'Магнит опыта',      desc:'+40% опыта с врагов', max:4, apply:p=>p.xpMul+=.4},
   {id:'regen',  r:'rare',   ic:'✚', name:'Регенерация',       desc:'+0.5 HP в секунду', max:4, apply:p=>p.regen+=0.5},
-  {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+1.5% макс. HP за убийство', max:3, apply:p=>p.vamp+=0.015},
+  {id:'vamp',   r:'rare',   ic:'✜', name:'Вампиризм',         desc:'+1% макс. HP за убийство', max:5, apply:p=>p.vamp+=0.01},
   {id:'slow',   r:'rare',   ic:'❄', name:'Замедление',        desc:'Попадания замедляют врага сильнее с уровнем', max:2, apply:p=>p.slow+=1},
   {id:'fastreload', r:'rare', ic:'⟳', name:'Быстрая перезарядка', desc:'Перезарядка быстрее на 20%', max:3, apply:p=>p.reloadMul*=0.8},
   {id:'bigmag', r:'epic',   ic:'▭', name:'Расширенный магазин', desc:'+40% патронов в магазине', max:2, apply:p=>p.magMul*=1.4},
   {id:'poison', r:'rare',   ic:'☠', name:'Яд',                desc:'Попавшие враги травятся, сильнее и дольше с уровнем', max:3, apply:p=>p.poison+=1},
   {id:'multi',  r:'epic',   ic:'≡', name:'Раздвоение',        desc:'+1 пуля в каждом выстреле', max:4, apply:p=>p.extraShots++},
-  {id:'thorns', r:'epic',   ic:'✸', name:'Шипы',              desc:'Враг, дотронувшийся до тебя, получает 16 урона', max:3, apply:p=>p.thorns+=16},
+  {id:'thorns', r:'epic',   ic:'✸', name:'Шипастая броня',    desc:'Урон в ближнем бою −10%, враг при касании отлетает и замирает на 1 с (кроме боссов)', max:3, apply:p=>p.thorns++},
   {id:'knock',  r:'epic',   ic:'⇱', name:'Отдача',            desc:'Пули отбрасывают врага (боссов слабее)', max:3, apply:p=>p.knock+=55},
-  {id:'orb',    r:'epic',   ic:'◍', name:'Орбита',            desc:'+1 шар кружит вокруг тебя и бьёт врагов', max:3, apply:p=>p.orbs++},
+  {id:'orb',    r:'epic',   ic:'◍', name:'Орбита',            desc:'+1 шар кружит вокруг тебя, бьёт врагов и замедляет их снаряды', max:3, apply:p=>p.orbs++},
   {id:'shield', r:'epic',   ic:'◌', name:'Щит',               desc:'Щит гасит один удар и восстанавливается', max:2, apply:p=>p.shieldMax+=1},
   {id:'ricochet',r:'epic',  ic:'↺', name:'Рикошет',           desc:'Пули отскакивают от стен', max:1, unique:true, apply:p=>p.ricochet=true},
   {id:'homing', r:'epic',   ic:'➹', name:'Самонаведение',     desc:'Пули подворачивают к врагам', max:1, unique:true, apply:p=>p.homing+=2},
@@ -1386,8 +1387,8 @@ const ARTIFACTS = [
   {id:'a_prism', ic:'↺', name:'Призма',         desc:'Рикошет и пробитие +1',          apply:p=>{p.ricochet=true;p.pierce+=1;}},
   {id:'a_eye',   ic:'➹', name:'Глаз пещеры',    desc:'Сильное наведение и пробитие +1',apply:p=>{p.homing+=3;p.pierce+=1;}},
   {id:'a_boots', ic:'»', name:'Сапоги гнома',   desc:'+30% скорость, паутина не держит',apply:p=>{p.speed*=1.3;p.webImmune=true;p.surfaceImmune=true;}},
-  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+6% макс. HP за убийство и +10% урон',  apply:p=>{p.vamp+=0.06;p.dmgMul*=1.1;}},
-  {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+3 орбиты, урон орбит вдвое',    apply:p=>{p.orbs+=3;p.orbMul*=2;}},
+  {id:'a_vamp',  ic:'✜', name:'Кровавый камень',desc:'+5% макс. HP за убийство и +10% урон',  apply:p=>{p.vamp+=0.05;p.dmgMul*=1.1;}},
+  {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+3 орбиты, урон орбит вдвое, снаряды врагов в шарах замедляются', apply:p=>{p.orbs+=3;p.orbMul*=2;}},
   {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Сильный ядовитый шлейф за спиной',apply:p=>p.gasTrail=true},
   {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка ×0.4 и +50% магазин',apply:p=>{p.reloadMul*=0.4;p.magMul*=1.5;}},
   {id:'a_reroll',ic:'⏳', name:'Часы перемотки', desc:'Все прошлые барабаны крутятся заново', ultra:true, apply:p=>{p.rerollLeft = plvl;}}
@@ -1416,13 +1417,15 @@ const MOB_NAMES = {
 
 // элитные враги: пометка ◆, опыт ×4, золото ×3, шанс дропа золота ×2
 const ELITES = {
-  fat:    {name:'Толстяк',   color:'#c8e05a', hp:3,   speed:.7,   base:'slime'},
-  weaver: {name:'Ткач',      color:'#a98bff', hp:1.6, speed:1,    base:'spider'},
-  hunter: {name:'Охотник',   color:'#ff9a3a', hp:2,   speed:1.15, base:'bat'},
-  fire:   {name:'Пламенный', color:'#ff5c3a', hp:1.8, speed:1,    base:'skull'},
-  shield: {name:'Щитоносец', color:'#c9d4de', hp:2.5, speed:.9,   base:'skeleton'},
-  sniper: {name:'Снайпер',   color:'#8ef0ff', hp:1.8, speed:.8,   base:'spitter'}
+  fat:    {name:'Толстяк',   color:'#c8e05a', hp:4,   speed:.7,   base:'slime'},
+  weaver: {name:'Ткач',      color:'#a98bff', hp:3.5, speed:1,    base:'spider'},
+  hunter: {name:'Охотник',   color:'#ff9a3a', hp:3.5, speed:1.15, base:'bat'},
+  fire:   {name:'Пламенный', color:'#ff5c3a', hp:3.5, speed:1,    base:'skull'},
+  shield: {name:'Щитоносец', color:'#c9d4de', hp:4,   speed:.9,   base:'skeleton'},
+  sniper: {name:'Снайпер',   color:'#8ef0ff', hp:3.5, speed:.8,   base:'spitter'}
 };
+// урон элиты — доля сверх обычного моба
+const ELITE_DMG = 1.35;
 const eliteFor = type => Object.keys(ELITES).find(k => ELITES[k].base === type);
 
 // 0–2 элиты на уровень: с 6-го уровня, «Тяжёлые» +1, «Стая» — без элит, на боссах только со слоя 2
@@ -1635,6 +1638,7 @@ function spawnEnemy(type, near, allowElite){
     e.elite = id;
     e.hp = e.maxHp = e.maxHp * el.hp;
     e.speed *= el.speed;
+    e.dmg *= ELITE_DMG;
     e.xp *= 4;
     e.gold = 3;
     e.scale *= 1.2;
@@ -1933,7 +1937,9 @@ function shoot(){
       pierce: (w.pierce || 0) + P.pierce, hit: new Set(),
       rocket: !!w.rocket, aoe: w.aoe || (P.boom?70:0) || (w.rocket?70:0),
       freeze: !!w.freeze, chain: w.chain || 0,
-      thin: !!w.thin, life: 2.4, r: w.thin?5:8, grace: .02,
+      thin: !!w.thin, life: w.grenade ? w.fuse : 2.4, r: w.thin?5:8, grace: .02,
+      // граната: та же физика «взрыва по площади», но с отскоками и фитилём
+      grenade: !!w.grenade, bounces: w.bounces || 0,
       // луч/рельса теряют урон медленнее (-10%), обычные пули -30%
       fall: w.thin ? .9 : .7
     });
@@ -2211,6 +2217,16 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.4.0', big:true, title:'Бафы и нерфы', items:[
+    'Элиты больше не картон: HP ×3.5–4 от базы и +35% урона, у Охотника рывок дольше держит телеграф.',
+    'Отталкивание понерфил: толчок больше не складывается с каждой пулей, потолок 220 — дробовик и миниган не уносят мобов с экрана.',
+    'Вампиризм: +1% за стак, стаков теперь 5. «Кровавый камень» — +5% вместо +6%.',
+    '«Шипы» стали «Шипастой бронёй»: −10% урона в ближнем бою, а коснувшийся враг отлетает и замирает на 1 с (кроме боссов).',
+    'Орбиты теперь защищают: вражеские снаряды, попавшие в шар, заметно замедляются.',
+    'Гранатомёт стал гранатой: отскакивает от стен до 3 раз, взрывается по касанию с мобом или по фитилю 1.4 с, урон полный.',
+    'Костяной владыка переделан: девять взрывающихся черепов кольцом, телеграф, залп. Погиб последний — через секунду новая девятка.',
+    'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
+  ]},
   {v:'v1.31.4', items:[
     'Мелкие внутренние правки: отладочные ссылки на уровни и служебные штуки для тестов.'
   ]},
@@ -2264,7 +2280,7 @@ function refreshUpdates(){
   CHANGELOG.forEach(c => {
     const d = document.createElement('div');
     d.className = 'upd' + (c.big ? ' big' : '');
-    d.innerHTML = `<h3>${c.v}${c.big ? ' · БОЛЬШОЕ' : ''}</h3>
+    d.innerHTML = `<h3>${c.v}${c.big ? ' · ' + (c.title || 'БОЛЬШОЕ') : ''}</h3>
       <ul>${c.items.map(i => `<li>${i}</li>`).join('')}</ul>`;
     body.appendChild(d);
   });
@@ -2297,6 +2313,7 @@ const ELITE_DESC = {
 };
 const BOSS_DESC = {
   summon:'Призывает слуг и бьёт по площади', shoot:'Держит дистанцию, стреляет веером',
+  boneking:'Девять черепов кольцом: телеграф, залп, новая девятка',
   charge:'Разгоняется и таранит', cocoon:'Прячется в кокон, плодит пауков',
   worm:'Ныряет в пол и выныривает под героем', golem:'Стойка отражает снаряды, в трещинах +50% урона',
   queen:'Залпы осколков, лёд под ногами, вьюга', skelord:'Три фазы: коса, призыв, вращение'
@@ -2854,6 +2871,8 @@ function update(dt){
         b.vx = Math.cos(na)*sp; b.vy = Math.sin(na)*sp;
       }
     }
+    // граната летит тяжело: скорость быстро гаснет
+    if (b.grenade){ const gk = Math.pow(0.55, dt); b.vx *= gk; b.vy *= gk; }
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
     // ледяные стены королевы гасят снаряды
     if (iceWalls.length){
@@ -2861,14 +2880,36 @@ function update(dt){
       for (const w of iceWalls) if (Math.hypot(b.x-w.x, b.y-w.y) < w.r){ blocked = true; break; }
       if (blocked){ parts.push({x:b.x, y:b.y, life:.16, max:.16, kind:'hit'}); bullets.splice(i,1); continue; }
     }
-    if (b.life <= 0){ bullets.splice(i,1); continue; }
+    if (b.life <= 0){
+      if (b.grenade && b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
+      bullets.splice(i,1); continue;
+    }
     if (b.grace <= 0 && solidPx(b.x,b.y)){
-      if (b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
-      if (P.ricochet && !b.rocket){
-        b.vx *= -1; b.vy *= -1; b.life -= .15;
-        if (b.life <= 0){ bullets.splice(i,1); continue; }
-        b.x += b.vx*dt*2; b.y += b.vy*dt*2;
-      } else { bullets.splice(i,1); continue; }
+      if (b.grenade){
+        if (b.bounces > 0){
+          // отскок от стены: отражаем по той оси, которая выводит из стены
+          b.bounces--;
+          const sp2 = Math.hypot(b.vx, b.vy);
+          const cur = Math.atan2(b.vy, b.vx);
+          let bounced = false;
+          for (const cand of [Math.PI - cur, -cur]){
+            const nx = Math.cos(cand)*sp2, ny = Math.sin(cand)*sp2;
+            if (!solidPx(b.x + nx*dt*3, b.y + ny*dt*3)){ b.vx = nx; b.vy = ny; bounced = true; break; }
+          }
+          b.vx *= .85; b.vy *= .85;
+          b.x -= b.vx*dt*2; b.y -= b.vy*dt*2;
+          parts.push({x:b.x, y:b.y, life:.14, max:.14, kind:'hit'});
+          sfx('hit');
+          if (!bounced){ explode(b.x, b.y, b.dmg, b.aoe); bullets.splice(i,1); continue; }
+        } else { explode(b.x, b.y, b.dmg, b.aoe); bullets.splice(i,1); continue; }
+      } else {
+        if (b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
+        if (P.ricochet && !b.rocket){
+          b.vx *= -1; b.vy *= -1; b.life -= .15;
+          if (b.life <= 0){ bullets.splice(i,1); continue; }
+          b.x += b.vx*dt*2; b.y += b.vy*dt*2;
+        } else { bullets.splice(i,1); continue; }
+      }
     }
     let gone = false;
     // могилы можно расстрелять
@@ -2935,14 +2976,19 @@ function update(dt){
           en.poisonT = 2.4 + .9*P.poison;
           en.poisonDmg = Math.max(en.poisonDmg, b.dmg * (0.15 + 0.12*P.poison));
         }
-        if (P.knock){ const a3 = Math.atan2(en.y-b.y, en.x-b.x);
-          const imp = P.knock * 6 * (en.boss ? .25 : 1);
-          en.kvx = (en.kvx || 0) + Math.cos(a3)*imp;
-          en.kvy = (en.kvy || 0) + Math.sin(a3)*imp; }
+        // Отдача: толчок не складывается залпом, есть потолок и КД между попаданиями
+        if (P.knock && !(en.knockCd > 0)){ const a3 = Math.atan2(en.y-b.y, en.x-b.x);
+          const imp = P.knock * 2.5 * (en.boss ? .25 : 1);
+          const cur = Math.hypot(en.kvx || 0, en.kvy || 0);
+          const vel = Math.min(220, Math.max(cur, imp));
+          en.kvx = Math.cos(a3)*vel; en.kvy = Math.sin(a3)*vel;
+          en.knockCd = .12; }
         b.hit.add(en);
         parts.push({x:b.x,y:b.y,life:.16,max:.16,kind:'hit'});
         sfx('hit');
-        if (b.aoe) explode(b.x, b.y, b.dmg*.5, b.aoe);
+        // граната рвётся полным уроном, ракета — половиной
+        if (b.aoe) explode(b.x, b.y, b.grenade ? b.dmg : b.dmg*.5, b.aoe);
+        if (b.grenade){ bullets.splice(i,1); gone = true; break; }
         if (b.pierce > 0){ b.pierce--; b.dmg *= (b.fall || 0.7); } else { bullets.splice(i,1); gone = true; }
         break;
       }
@@ -2953,6 +2999,18 @@ function update(dt){
   for (let i = ebullets.length-1; i >= 0; i--){
     const b = ebullets[i];
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
+    // орбиты тормозят снаряды: один раз на снаряд
+    if (P.orbs && !b.slowed){
+      for (let k = 0; k < P.orbs; k++){
+        const a2 = P.orbA + k*(Math.PI*2/P.orbs);
+        const ox = P.x+Math.cos(a2)*70, oy = P.y+Math.sin(a2)*70;
+        if (Math.hypot(b.x-ox, b.y-oy) < 16){
+          b.vx *= .4; b.vy *= .4; b.life /= .4; b.slowed = true;
+          parts.push({x:b.x, y:b.y, life:.2, max:.2, kind:'hit'});
+          break;
+        }
+      }
+    }
     if (b.life <= 0 || solidPx(b.x,b.y)){ ebullets.splice(i,1); continue; }
     if (iceWalls.length && iceWalls.some(w => Math.hypot(b.x-w.x, b.y-w.y) < w.r)){ ebullets.splice(i,1); continue; }
     if (Math.hypot(P.x-b.x, P.y-b.y) < 16){ ebullets.splice(i,1); hurtPlayer(b.dmg); }
@@ -2964,6 +3022,11 @@ function update(dt){
     if (en.flash > 0) en.flash -= dt;
     if (en.slowT > 0) en.slowT -= dt;
     if (en.poisonT > 0){ en.poisonT -= dt; en.hp -= en.poisonDmg*dt; }
+    // таймеры: стан от «Шипастой брони», КД отброса и отражения
+    if (en.stunT > 0) en.stunT -= dt;
+    if (en.thornCd > 0) en.thornCd -= dt;
+    if (en.knockCd > 0) en.knockCd -= dt;
+    const frozen = en.stunT > 0;
     // импульс от «Отдачи»: толкаем и плавно гасим скорость
     if (en.kvx || en.kvy){
       moveWithCollision(en, en.kvx*dt, en.kvy*dt);
@@ -2980,7 +3043,8 @@ function update(dt){
     const tx = tgt ? tgt.x : P.x, ty = tgt ? tgt.y : P.y;
     const tdx = tx-en.x, tdy = ty-en.y, td = Math.hypot(tdx,tdy)||1;
 
-    if (en.boss) bossUpdate(en, dt, d, ux, uy, slowMul);
+    if (frozen){ /* стан: пропускаем ход */ }
+    else if (en.boss) bossUpdate(en, dt, d, ux, uy, slowMul);
     else if (en.type === 'spitter'){
       if (en.elite === 'sniper'){
         // снайпер: 1 с лазерной наводки, потом быстрый снаряд на 30 урона
@@ -3009,7 +3073,7 @@ function update(dt){
         if (en.windT > 0){
           en.windT -= dt;
           if (en.windT <= 0){ en.huntCd = 3; en.dashT = .3; sfx('shoot'); }
-        } else if (en.huntCd <= 0 && d < 380) en.windT = .6;
+        } else if (en.huntCd <= 0 && d < 380) en.windT = .9;
         if (en.dashT > 0){
           en.dashT -= dt;
           moveWithCollision(en, ux*560*dt, uy*560*dt);
@@ -3021,6 +3085,10 @@ function update(dt){
       if (canStand(en.x+jx, en.y, jr)) en.x += jx;
       if (canStand(en.x, en.y+jy, jr)) en.y += jy;
       moveWithCollision(en, tdx/td*en.speed*slowMul*enRamp*dt, tdy/td*en.speed*slowMul*enRamp*dt);
+    } else if (en.summoned){
+      // черепа Костяного владыки: стоят в кольце, потом летят на героя
+      if (en.holdT > 0) en.holdT -= dt;
+      else moveWithCollision(en, ux*(en.homeSpeed || 300)*slowMul*dt, uy*(en.homeSpeed || 300)*slowMul*dt);
     } else {
       moveWithCollision(en, tdx/td*en.speed*slowMul*enRamp*dt, tdy/td*en.speed*slowMul*enRamp*dt);
     }
@@ -3035,13 +3103,25 @@ function update(dt){
       en.face += clamp(dd, -1.4*dt, 1.4*dt);
     }
 
-    if (d < en.r+15){
-      if (P.thorns){ en.hp -= P.thorns; en.flash = .12; }
-      hurtPlayer(en.dmg);
+    if (!frozen && d < en.r+15){
+      // «Шипастая броня»: без урона в ответ — отброс и стан (боссам только отброс)
+      if (P.thorns && !(en.thornCd > 0)){
+        en.thornCd = 1.5;
+        const a4 = Math.atan2(en.y-P.y, en.x-P.x);
+        const push = en.boss ? 225 : 900;
+        en.kvx = Math.cos(a4)*push; en.kvy = Math.sin(a4)*push;
+        if (!en.boss) en.stunT = 1;
+        en.flash = .12;
+        parts.push({x:en.x, y:en.y, life:.28, max:.28, kind:'shock', size:38});
+        sfx('hit');
+      }
+      // череп Костяного владыки рвётся при касании (владыке свои черепа не вредят)
+      if (en.summoned) { explode(en.x, en.y, en.dmg*1.2, 150, en.summoned); en.hp = 0; }
+      hurtPlayer(en.dmg, true);
     }
 
     // паук плетёт паутину (у ткача — шире и вязче)
-    if (ENEMY[en.type] && ENEMY[en.type].web){
+    if (!frozen && ENEMY[en.type] && ENEMY[en.type].web){
       en.cd -= dt;
       if (en.cd <= 0){
         const weaver = en.elite === 'weaver';
@@ -3049,8 +3129,8 @@ function update(dt){
         webs.push({x:en.x, y:en.y, r: weaver ? 64 : 46, life:5, max:5, slow: weaver ? .25 : .5});
       }
     }
-    // черепок: поджигает фитиль вблизи и взрывается
-    if (ENEMY[en.type] && ENEMY[en.type].kamikaze){
+    // черепок: поджигает фитиль вблизи и взрывается (призванные владыкой — не поджигают)
+    if (!frozen && !en.summoned && ENEMY[en.type] && ENEMY[en.type].kamikaze){
       const fire = en.elite === 'fire', fuseLen = fire ? 3.5 : 2.5;
       if (en.fuse === undefined) en.fuse = -1;
       if (en.fuse < 0 && d < (fire ? 220 : 170)){ en.fuse = fuseLen; sfx('click'); }
@@ -3075,6 +3155,11 @@ function update(dt){
 
     if (en.hp <= 0){
       enemies.splice(i,1);
+      // призванные черепа не идут в квоту и не дают лута
+      if (en.summoned){
+        parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
+        continue;
+      }
       kills++;
       addGold((1 + lvl*.4) * 1.15 * (en.gold || 1));
       if (P.vamp && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.vamp*P.maxHp);
@@ -3112,6 +3197,8 @@ function update(dt){
       if (en.boss){
         const wasMain = (en === bossRef);
         if (wasMain) bossRef = null;
+        // черепа владыки уходят вместе с ним
+        if (en.bossKind === 'boneking') for (const o of enemies) if (o.summoned === en) o.hp = 0;
         addGold(40 + lvl*8);
 
         // Скелет-владыка: четыре фазы, на каждой выходят двое прежних боссов
@@ -3365,7 +3452,7 @@ function bossGolem(en, dt, d, ux, uy, fx, fy, sp){
     en.punch -= dt;
     if (en.punch <= 0){
       explode(en.punchX, en.punchY, en.dmg*.8, 95);
-      if (Math.hypot(P.x-en.punchX, P.y-en.punchY) < 100) hurtPlayer(en.dmg*.8);
+      if (Math.hypot(P.x-en.punchX, P.y-en.punchY) < 100) hurtPlayer(en.dmg*.8, true);
       en.punch = null; en.punchT = 3.6;
     }
   }
@@ -3396,6 +3483,51 @@ function bossQueen(en, dt, d, ux, uy, fx, fy, sp){
   }
   if (phase2 && !en.blizzDone){ en.blizzDone = 1; en.blizzT = 4; toast = 'ВЬЮГА'; toastT = 2; }
   if (en.blizzT > 0) en.blizzT -= dt;
+}
+
+// Костяной владыка: кольцо из девяти взрывающихся черепов, телеграф, залп.
+// Новое кольцо — как только падает последний череп предыдущего.
+function bossBoneking(en, dt, d, ux, uy, fx, fy, sp){
+  const phase2 = en.hp < en.maxHp*.5;
+  if (!en.said){ en.said = 1; toast = 'КОСТЯНОЙ ВЛАДЫКА'; toastT = 3; }
+  moveWithCollision(en, fx*sp*dt*.6, fy*sp*dt*.6);
+  if (!en.bkState){ en.bkState = 'reload'; en.bkT = .6; }
+  const mine = enemies.filter(o => o.summoned === en);
+  if (en.bkState === 'ring'){
+    en.bkT -= dt;
+    if (en.bkT <= 0){
+      // залп: все черепа разом летят на героя
+      for (const o of mine){ o.holdT = 0; o.homeSpeed = phase2 ? 340 : 300; }
+      en.bkState = 'volley';
+      sfx('shoot');
+      toast = 'ЗАЛП'; toastT = 1.2;
+    }
+  } else if (en.bkState === 'volley'){
+    if (!mine.length){ en.bkState = 'reload'; en.bkT = phase2 ? .8 : 1.2; }
+  } else {
+    en.bkT -= dt;
+    if (en.bkT <= 0 && !mine.length && enemies.length < 40) spawnBoneRing(en, phase2);
+  }
+}
+function spawnBoneRing(en, phase2){
+  const n = 9, tele = phase2 ? 1.5 : 2.0;
+  for (let k = 0; k < n; k++){
+    const a = k*(Math.PI*2/n) - Math.PI/2;
+    // кольцо у стены сжимается, но черепа не улетают на другой конец карты
+    let pos = {x:en.x, y:en.y};
+    outer:
+    for (let rr = 95; rr >= 40; rr -= 14){
+      for (const off of [0, .2, -.2, .4, -.4, .65, -.65, .95, -.95]){
+        const px = en.x + Math.cos(a+off)*rr, py = en.y + Math.sin(a+off)*rr;
+        if (canStand(px, py, 14) && !solidPx(px, py)){ pos = {x:px, y:py}; break outer; }
+      }
+    }
+    const e = spawnEnemy('skull', {x:pos.x, y:pos.y});
+    e.summoned = en; e.holdT = tele; e.fuse = -1; e.xp = 0; e.scale *= .95;
+    parts.push({x:e.x, y:e.y, life:.4, max:.4, kind:'tp', size:e.scale});
+  }
+  en.bkState = 'ring'; en.bkT = tele;
+  sfx('portal');
 }
 
 // пятно льда 3×3 под героем на 6 с
@@ -3472,6 +3604,7 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
   if (en.bossKind === 'worm') bossWorm(en, dt, d, ux, uy, fx, fy, sp);
   else if (en.bossKind === 'golem') bossGolem(en, dt, d, ux, uy, fx, fy, sp);
   else if (en.bossKind === 'queen') bossQueen(en, dt, d, ux, uy, fx, fy, sp);
+  else if (en.bossKind === 'boneking') bossBoneking(en, dt, d, ux, uy, fx, fy, sp);
   else if (en.bossKind === 'summon'){
     moveWithCollision(en, fx*sp*dt*.9, fy*sp*dt*.9);
     if (en.cd <= 0){
@@ -3560,8 +3693,10 @@ function bossUpdate(en, dt, d, ux, uy, slowMul){
   }
 }
 
-function hurtPlayer(dmg){
+function hurtPlayer(dmg, melee){
   if (P.iframe > 0) return;
+  // «Шипастая броня»: −10% урона в ближнем бою за стак
+  if (melee && P.thorns) dmg *= 1 - Math.min(.3, .10*P.thorns);
   sfx('hurt');
   if (P.shield > 0){ P.shield--; P.iframe = .4; parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'}); return; }
   P.hp -= dmg*(1-Math.min(.8,P.armor));
@@ -3581,10 +3716,10 @@ function hurtPlayer(dmg){
   }
   if (P.hp <= 0) gameOver();
 }
-function explode(x,y,dmg,r){
+function explode(x,y,dmg,r,ignore){
   sfx('boom');
   parts.push({x,y,life:.3,max:.3,kind:'boom',size:r});
-  for (const en of enemies) if (!en.cocoon && Math.hypot(en.x-x, en.y-y) < r+en.r){ en.hp -= dmg; en.flash = .12; }
+  for (const en of enemies) if (en !== ignore && !en.cocoon && Math.hypot(en.x-x, en.y-y) < r+en.r){ en.hp -= dmg; en.flash = .12; }
 }
 function addGold(n){
   meta.goldAcc = (meta.goldAcc || 0) + n * P.goldMul * 0.2 * tierLoot();
@@ -3615,6 +3750,8 @@ function enterPortal(){
     `<span>Герой: <b>${plvl}</b></span><span>Золото: <b>${meta.gold}</b></span>`;
   $('nameBox').style.display = 'none';
   $('btnNext').textContent = !next ? 'Финал' : next.boss ? 'К боссу!' : 'Дальше';
+  // после смерти кнопка перевешивалась на «Сохранить и в меню» — возвращаем переход
+  $('btnNext').onclick = () => { sfx('click'); nextLevel(); };
   show('levelend');
   stopMusic();
   showHud(false);
@@ -4435,7 +4572,18 @@ function render(){
 
   for (const b of bullets){
     const bx = b.x-cam.x, by = b.y-cam.y;
-    if (b.rocket){ ctx.fillStyle='#ffb340'; ctx.beginPath(); ctx.arc(bx,by,7,0,6.3); ctx.fill();
+    if (b.grenade){
+      // граната: крутится, в конце фитиля мигает
+      const ang = b.x*0.02, blink = b.life < .4 && Math.floor(b.life*12) % 2 === 0;
+      ctx.save(); ctx.translate(bx, by); ctx.rotate(ang);
+      ctx.fillStyle = blink ? '#ffe066' : '#8a6a3a';
+      ctx.beginPath(); ctx.arc(0, 0, 8, 0, 6.3); ctx.fill();
+      ctx.strokeStyle = '#d9c08a'; ctx.lineWidth = 2; ctx.beginPath();
+      ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.stroke();
+      ctx.fillStyle = '#3f2d16'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, 6.3); ctx.fill();
+      ctx.restore();
+    }
+    else if (b.rocket){ ctx.fillStyle='#ffb340'; ctx.beginPath(); ctx.arc(bx,by,7,0,6.3); ctx.fill();
       ctx.fillStyle='#fff3c4'; ctx.beginPath(); ctx.arc(bx,by,3,0,6.3); ctx.fill(); }
     else if (b.thin){ ctx.strokeStyle = b.crit?'#fff3c4':'#8ef0ff'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx-b.vx*.012, by-b.vy*.012); ctx.stroke(); }
