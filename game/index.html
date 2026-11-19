@@ -2348,7 +2348,7 @@ const MOB_DESC = {
   spider:'Плетёт паутину: −50% скорости', skull:'Поджигает фитиль рядом и взрывается'
 };
 const ELITE_DESC = {
-  fat:'×3 HP, при смерти распадается на слизней', weaver:'Паутина шире и −75% скорости',
+  fat:'HP как у мини-босса, при смерти распадается на слизней', weaver:'Паутина шире и −75% скорости',
   hunter:'Рывок к герою раз в 3 с после телеграфа', fire:'Взрыв 150 + горящая зона 3 с',
   shield:'Сектор спереди гасит 80% урона', sniper:'Лазерная наводка, затем снаряд на 30'
 };
@@ -2456,10 +2456,14 @@ function refreshBestiary(){
           const el = ELITES[k];
           row.appendChild(beastChip(el.base, 'элита · ' + el.name, {
             elite: true, diamond: el.color, desc: ELITE_DESC[k],
-            stats: `×${el.hp} hp · ×${el.speed} скор.`
+            stats: `~${Math.round(Math.min(.22, .10 + .004*last) * 100)}% HP босса · −${Math.round(ELITE_RESIST*100)}% входящего урона`
           }));
         });
         card.appendChild(row);
+        const note = document.createElement('p');
+        note.style.cssText = 'font-size:11px;color:#7b8896;margin:4px 0 0';
+        note.textContent = 'Элиты — мини-боссы: одна на уровень, HP считаем от босса биома, входящий урон у них ниже.';
+        card.appendChild(note);
       }
       // босс: карточка + таблица «кто, где, как, лор»
       const bossRow = document.createElement('div');
@@ -2471,6 +2475,7 @@ function refreshBestiary(){
       tbl.innerHTML =
         `<tr><th>уровень</th><td>${last}</td></tr>
          <tr><th>поведение</th><td>${BOSS_DESC[B.kind] || '—'}</td></tr>
+         <tr><th>фазы</th><td>ярость ниже половины HP · щит-окно раз за бой</td></tr>
          <tr><th>лор</th><td class="lore">${BOSS_LORE[B.kind] || 'будет позже'}</td></tr>`;
       bossRow.appendChild(tbl);
       card.appendChild(bossRow);
