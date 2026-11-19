@@ -310,9 +310,7 @@
   </div>
   <div class="menuGrid">
     <button id="btnBestiary">Бестиарий</button>
-    <button id="btnRecords">Рекорды</button>
     <button id="btnSettings">Настройки</button>
-    <button id="btnHelp">Управление</button>
   </div>
   <button id="btnFullMenu" title="На весь экран">⛶</button>
 </div>
@@ -364,7 +362,10 @@
     <h2>Бестиарий</h2>
     <p>Открытые биомы и кто в них живёт.</p>
     <div id="bestiaryBody"></div>
-    <button id="btnBestiaryBack" style="margin-top:12px;width:100%">Назад</button>
+    <div class="btns" style="width:100%;margin-top:12px">
+      <button id="btnRecordsFromBestiary" class="small">Мои рекорды</button>
+      <button id="btnBestiaryBack">Назад</button>
+    </div>
   </div>
 </div>
 
@@ -402,6 +403,7 @@
     </div>
     <div class="btns" style="width:100%">
       <button id="btnTouchForce" class="small">Джойстик: авто</button>
+      <button id="btnHelpFromSettings" class="small">Управление и подсказки</button>
       <button id="btnBackSettings">Назад</button>
     </div>
     <p id="modeHelp" style="margin:10px 0 0;font-size:12px"></p>
@@ -2246,7 +2248,7 @@ const CHANGELOG = [
     'Полоска HP над элитой теперь в цвет элиты, а не просто красная.',
     'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
-    'Главное меню собрано компактнее: пять основных кнопок и сетка 2×2 для остальных, плюс кнопка «на весь экран» прямо в меню.',
+    'Главное меню собрано компактнее: Играть, Магазин, Обучение + две плитки — Бестиарий и Настройки. Рекорды теперь внутри бестиария, «Управление» — внутри настроек, а справа сверху появилась кнопка «на весь экран».',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
   ]},
   {v:'v1.31.4', items:[
@@ -2511,7 +2513,7 @@ $('bigBanner').onclick = openUpdates;
 $('btnUpdatesBack').onclick = () => { hide('updates'); show('menu'); refreshMenu(); };
 
 $('btnPlay').onclick = () => { hide('menu'); openPick(); };$('btnShop').onclick = () => { hide('menu'); refreshShop(); show('shop'); };
-$('btnRecords').onclick = () => { hide('menu'); refreshRecords(); show('records'); };
+$('btnRecordsFromBestiary').onclick = () => { sfx('click'); beastOpen = false; hide('bestiary'); refreshRecords(); show('records'); };
 $('btnSettings').onclick = () => { hide('menu'); settingsFrom = 'menu'; syncSettings(); show('settings'); };
 const DEV_FACES = ['assets/devs/face1.png','assets/devs/face2.png','assets/devs/face3.png','assets/devs/face4.png','assets/devs/face5.png'];
 function spawnDevFaces(){
@@ -2534,15 +2536,18 @@ function spawnDevFaces(){
   }
 }
 $('logoBtn').onclick = () => { sfx('click'); hide('menu'); spawnDevFaces(); show('devs'); };
-$('btnHelp').onclick = () => { hide('menu'); show('help'); };
+$('btnHelpFromSettings').onclick = () => { sfx('click'); hide('settings'); show('help'); };
 $('btnBack1').onclick = () => { hide('devs'); show('menu'); };
-$('btnBack2').onclick = () => { hide('help'); show('menu'); };
+$('btnBack2').onclick = () => { hide('help'); show('settings'); syncSettings(); };
 $('btnBackSettings').onclick = () => {
   hide('settings');
   if (settingsFrom === 'pause') show('pause'); else { show('menu'); refreshMenu(); }
 };
 $('btnShopBack').onclick = () => { hide('shop'); show('menu'); refreshMenu(); };
-$('btnRecordsBack').onclick = () => { hide('records'); show('menu'); refreshMenu(); };
+$('btnRecordsBack').onclick = () => {
+  hide('records'); show('bestiary'); refreshBestiary();
+  beastOpen = true; requestAnimationFrame(beastLoop);
+};
 
 // ---------- пауза / HUD-кнопки / настройки ----------
 let settingsFrom = 'menu';
