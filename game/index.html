@@ -2247,6 +2247,8 @@ const CHANGELOG = [
     'Удар по герою стал читаемым: по краям экрана вспыхивает красная виньетка.',
     'Полоска HP над элитой теперь в цвет элиты, а не просто красная.',
     'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
+    'Яд понерфил: облака больше не суммируются — один тик урона на моба в 0.3 с, шлейф бьёт 6 (+2 за стак яда), а отравление тикает слабее.',
+    'Отравленного врага теперь видно: зелёный ореол и пузырьки.',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
     'Главное меню собрано компактнее: Играть, Магазин, Обучение + две плитки — Бестиарий и Настройки. Рекорды теперь внутри бестиария, «Управление» — внутри настроек, а справа сверху появилась кнопка «на весь экран».',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
@@ -2797,7 +2799,7 @@ function update(dt){
     P.gasT += dt;
     if (P.gasT > .22){
       P.gasT = 0;
-      clouds.push({x:P.x, y:P.y, r:72, life:1.5, max:1.5, tick:0, dmg:8 + 4*(P.poison||1)});
+      clouds.push({x:P.x, y:P.y, r:72, life:1.5, max:1.5, tick:0, dmg:6 + 2*(P.poison||1)});
     }
   }
   if (P.iframe > 0) P.iframe -= dt;
@@ -3062,6 +3064,7 @@ function update(dt){
     if (en.stunT > 0) en.stunT -= dt;
     if (en.thornCd > 0) en.thornCd -= dt;
     if (en.knockCd > 0) en.knockCd -= dt;
+    if (en.cloudCd > 0) en.cloudCd -= dt;
     const frozen = en.stunT > 0;
     // импульс от «Отдачи»: толкаем и плавно гасим скорость
     if (en.kvx || en.kvy){
@@ -3322,10 +3325,12 @@ function update(dt){
     if (c.tick <= 0){
       c.tick = .3;
       for (const en of enemies){
+        // облака больше не суммируются: один тик на моба в 0.3 с, сколько бы их ни лежало
+        if (en.cloudCd > 0) continue;
         if (Math.hypot(en.x-c.x, en.y-c.y) < c.r + en.r*.5){
-          en.hp -= c.dmg; en.flash = .1;
-          en.poisonT = Math.max(en.poisonT, 1.5);
-          en.poisonDmg = Math.max(en.poisonDmg, 4);
+          en.hp -= c.dmg; en.flash = .1; en.cloudCd = .3;
+          en.poisonT = Math.max(en.poisonT, 1.2);
+          en.poisonDmg = Math.max(en.poisonDmg, 3);
         }
       }
       // горящая зона от Пламенного черепка жжёт и героя
@@ -4606,6 +4611,22 @@ function render(){
     }
     if (en.flash > 0){ ctx.globalAlpha=.55; ctx.fillStyle='#fff';
       ctx.beginPath(); ctx.arc(ex,ey,en.r*.8,0,6.3); ctx.fill(); ctx.globalAlpha=1; }
+    // отравление видно: зелёный ореол и пузырьки
+    if (en.poisonT > 0){
+      const pk = Math.min(1, en.poisonT / 1.2);
+      ctx.globalAlpha = (.11 + .06*Math.sin(en.t*9)) * pk + .04;
+      ctx.fillStyle = '#7ec24a';
+      ctx.beginPath(); ctx.arc(ex, ey, en.r*.95, 0, 6.3); ctx.fill();
+      ctx.globalAlpha = .55 * pk;
+      ctx.fillStyle = '#b6e878';
+      for (let pi = 0; pi < 3; pi++){
+        const pa = en.t*2.2 + pi*2.1;
+        ctx.beginPath();
+        ctx.arc(ex + Math.cos(pa)*en.r*.55, ey + Math.sin(pa)*en.r*.45 - en.scale*.18 + Math.sin(en.t*4+pi)*3, 2.4, 0, 6.3);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     if (en.maxHp > 40 && !en.boss){
       const w2 = en.scale*.9;
       ctx.fillStyle='#2a1a1a'; ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2, 5);
