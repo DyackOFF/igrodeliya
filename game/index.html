@@ -2249,6 +2249,7 @@ const CHANGELOG = [
     'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
     'Яд понерфил: облака больше не суммируются — один тик урона на моба в 0.3 с, шлейф бьёт 6 (+2 за стак яда), а отравление тикает слабее.',
     'Отравленного врага теперь видно: зелёный ореол и пузырьки.',
+    'Части распадающихся мобов больше не идут в счётчик уровня: раньше пара «распадающихся» закрывала квоту забега.',
     'Щит стало видно: сердце и HP в одной панели, под полоской — заряды щита с полоской восстановления, а вокруг героя светится купол (и вспыхивает, когда щит гасит удар).',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
     'Главное меню собрано компактнее: Играть, Магазин, Обучение + две плитки — Бестиарий и Настройки. Рекорды теперь внутри бестиария, «Управление» — внутри настроек, а справа сверху появилась кнопка «на весь экран».',
@@ -3201,7 +3202,7 @@ function update(dt){
         parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
         continue;
       }
-      kills++;
+      kills += en.noQuota ? 0 : 1;
       addGold((1 + lvl*.4) * 1.15 * (en.gold || 1));
       if (P.vamp && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.vamp*P.maxHp);
       gainXp(Math.round(en.xp * P.xpMul));
@@ -3211,10 +3212,12 @@ function update(dt){
         sfx('poison');
       }
       const def = ENEMY[en.type] || {};
+      // части распада не идут в квоту уровня: иначе один «распадающийся» моб закрывает половину
       if (def.splits && def.splitInto){
         for (let sp2 = 0; sp2 < 3; sp2++){
           const a2 = Math.random()*6.28;
-          spawnEnemy(def.splitInto, {x:en.x + Math.cos(a2)*22, y:en.y + Math.sin(a2)*22});
+          const ch = spawnEnemy(def.splitInto, {x:en.x + Math.cos(a2)*22, y:en.y + Math.sin(a2)*22});
+          ch.noQuota = true;
         }
       }
       if (def.revive){
@@ -3225,7 +3228,8 @@ function update(dt){
         const n = 2 + Math.floor(Math.random()*2);
         for (let k = 0; k < n; k++){
           const a2 = Math.random()*6.28;
-          spawnEnemy('slime', {x:en.x + Math.cos(a2)*24, y:en.y + Math.sin(a2)*24});
+          const ch = spawnEnemy('slime', {x:en.x + Math.cos(a2)*24, y:en.y + Math.sin(a2)*24});
+          ch.noQuota = true;
         }
       }
       if (en.elite === 'weaver'){
