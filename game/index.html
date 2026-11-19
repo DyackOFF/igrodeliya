@@ -47,6 +47,13 @@
   .credits{color:var(--amber);font-size:13.5px;letter-spacing:.04em;margin:0 0 12px;opacity:.92}
 
   .btns{display:flex;flex-direction:column;gap:7px;width:min(300px,84vw);flex:0 0 auto}
+  /* второстепенные пункты — компактной сеткой 2×2, вместо простыни кнопок */
+  .menuGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:min(300px,84vw);margin-top:2px}
+  .menuGrid button{font-size:11px;padding:9px 6px;letter-spacing:.05em}
+  #btnFullMenu{position:fixed;right:calc(10px + env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));
+    z-index:7;width:40px;height:40px;padding:0;font-size:16px;border-radius:10px;
+    background:rgba(20,30,14,.72);border:1px solid #3a4a26;color:#c9d6b8}
+  #btnFullMenu:hover{background:rgba(45,64,32,.9);color:#fff}
   button{font:inherit;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;
     padding:11px 15px;border-radius:10px;cursor:pointer;color:var(--txt);
     background:linear-gradient(160deg,#22301a,#151d12);border:1px solid #3a4a26;transition:.15s}
@@ -298,13 +305,16 @@
     <button class="primary" id="btnPlay">Играть</button>
     <button class="primary hidden" id="btnContinue">Продолжить</button>
     <button class="hidden" id="btnNewRun">Начать заново</button>
-    <button id="btnTutorial">Обучение</button>
     <button id="btnShop">Магазин</button>
-    <button id="btnRecords">Мои рекорды</button>
+    <button id="btnTutorial">Обучение</button>
+  </div>
+  <div class="menuGrid">
     <button id="btnBestiary">Бестиарий</button>
+    <button id="btnRecords">Рекорды</button>
     <button id="btnSettings">Настройки</button>
     <button id="btnHelp">Управление</button>
   </div>
+  <button id="btnFullMenu" title="На весь экран">⛶</button>
 </div>
 
 <div id="pick" class="screen hidden">
@@ -2236,6 +2246,7 @@ const CHANGELOG = [
     'Полоска HP над элитой теперь в цвет элиты, а не просто красная.',
     'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
+    'Главное меню собрано компактнее: пять основных кнопок и сетка 2×2 для остальных, плюс кнопка «на весь экран» прямо в меню.',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
   ]},
   {v:'v1.31.4', items:[
@@ -2597,12 +2608,14 @@ $('btnMusicHud').onclick = () => {
   if (meta.music === 0) stopMusic(); else if (state === 'play') startMusic();
   sfx('click');
 };
-$('btnFull').onclick = () => {
+function toggleFullscreen(){
   try {
     if (!document.fullscreenElement) (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (()=>{})).call(document.documentElement);
     else (document.exitFullscreen || document.webkitExitFullscreen || (()=>{})).call(document);
   } catch(e){}
-};
+}
+$('btnFull').onclick = toggleFullscreen;
+$('btnFullMenu').onclick = () => { sfx('click'); toggleFullscreen(); };
 $('btnResume').onclick = () => togglePause();
 $('btnPauseMenu').onclick = () => { hide('pause'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); showHud(false); updateTouchVisibility(); };
 $('btnPauseSettings').onclick = () => { settingsFrom = 'pause'; hide('pause'); syncSettings(); show('settings'); };
