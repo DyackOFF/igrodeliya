@@ -501,7 +501,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.31.3 (17.11)';
+const VERSION = 'v1.31.4 (19.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -2211,6 +2211,9 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.31.4', items:[
+    'Мелкие внутренние правки: отладочные ссылки на уровни и служебные штуки для тестов.'
+  ]},
   {v:'v1.31.3', items:[
     'Добавил страховку от спавна в текстурах: если герой всё-таки окажется в стене, его сразу выталкивает на свободный пол.'
   ]},
@@ -4816,7 +4819,7 @@ function boot(){
   if (location.hash === '#drum'){ meta.weapon='pistol'; startGame(); setTimeout(openDrum, 100); }
   if (location.hash === '#tut'){ startTutorial(); }
   const lm = /^#lvl(\d+)$/.exec(location.hash);
-  if (lm){ meta.weapon='pistol'; startGame(); startLevel(Math.max(0, Math.min(29, +lm[1] - 1))); }
+  if (lm){ meta.weapon='pistol'; startGame(); startLevel(Math.max(0, Math.min(TOT-1, +lm[1] - 1))); }
   const tm = /^#tut([1-6])$/.exec(location.hash);
   if (tm){ tutorial = true; startTutLesson(+tm[1] - 1); }
   requestAnimationFrame(loop);
