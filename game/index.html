@@ -16,7 +16,9 @@
   #wrap{position:fixed;inset:0;display:grid;place-items:center;background:#07080a}
   canvas{image-rendering:pixelated;display:block;box-shadow:0 0 90px rgba(0,0,0,.9);touch-action:none}
 
-  #hudbtns{position:fixed;right:10px;top:10px;z-index:6;display:none;gap:6px}
+  /* сверху по центру: справа они наезжали на строку «Уровень N/36 · босс» */
+  #hudbtns{position:fixed;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top));
+    z-index:6;display:none;gap:6px}
   #hudbtns.on{display:flex}
   #hudbtns button{width:42px;height:42px;padding:0;font-size:16px;border-radius:10px;
     background:rgba(20,30,14,.7);border:1px solid #3a4a26;color:#c9d6b8}
@@ -476,6 +478,7 @@
       <input type="text" id="nameInput" maxlength="14" placeholder="Твоё имя">
     </div>
     <button class="primary" id="btnNext" style="width:100%">Дальше</button>
+    <button class="primary" id="btnRetry" style="display:none;width:100%;margin-top:8px">Заново</button>
   </div>
 </div>
 
@@ -920,6 +923,8 @@ function musicWatchdog(){
 setInterval(musicWatchdog, 1500);
 addEventListener('visibilitychange', () => {
   if (!document.hidden && actx && actx.state === 'suspended') actx.resume();
+  // свернули вкладку/ушли с экрана — забег на паузе, а не идёт в фоне
+  else if (document.hidden && state === 'play') togglePause();
 });
 
 // ================= ГЕЙМПАД =================
@@ -2225,6 +2230,12 @@ const CHANGELOG = [
     'Орбиты теперь защищают: вражеские снаряды, попавшие в шар, заметно замедляются.',
     'Гранатомёт стал гранатой: отскакивает от стен до 3 раз, взрывается по касанию с мобом или по фитилю 1.4 с, урон полный.',
     'Костяной владыка переделан: девять взрывающихся черепов кольцом, телеграф, залп. Погиб последний — через секунду новая девятка.',
+    'Рикошет теперь честный: пуля отражается по касательной от стены, а не отлетает назад. Не больше двух отскоков.',
+    'Кнопки паузы и звука переехали наверх в центр — раньше они наезжали на строку «Уровень N/36 · босс».',
+    'Удар по герою стал читаемым: по краям экрана вспыхивает красная виньетка.',
+    'Полоска HP над элитой теперь в цвет элиты, а не просто красная.',
+    'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
+    'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
   ]},
   {v:'v1.31.4', items:[
@@ -2905,9 +2916,16 @@ function update(dt){
       } else {
         if (b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
         if (P.ricochet && !b.rocket){
-          b.vx *= -1; b.vy *= -1; b.life -= .15;
-          if (b.life <= 0){ bullets.splice(i,1); continue; }
-          b.x += b.vx*dt*2; b.y += b.vy*dt*2;
+          // отражение по нормали стены: гасим только ту ось, которая упёрлась
+          const prevX = b.x - b.vx*dt, prevY = b.y - b.vy*dt;
+          const blockedX = solidPx(b.x, prevY), blockedY = solidPx(prevX, b.y);
+          if (blockedX && !blockedY) b.vx *= -1;
+          else if (blockedY && !blockedX) b.vy *= -1;
+          else { b.vx *= -1; b.vy *= -1; }
+          b.ric = (b.ric || 0) + 1;
+          b.life -= .15;
+          if (b.life <= 0 || b.ric > 2){ bullets.splice(i,1); continue; }
+          b.x = prevX + b.vx*dt*1.6; b.y = prevY + b.vy*dt*1.6;
         } else { bullets.splice(i,1); continue; }
       }
     }
@@ -3752,6 +3770,7 @@ function enterPortal(){
   $('btnNext').textContent = !next ? 'Финал' : next.boss ? 'К боссу!' : 'Дальше';
   // после смерти кнопка перевешивалась на «Сохранить и в меню» — возвращаем переход
   $('btnNext').onclick = () => { sfx('click'); nextLevel(); };
+  $('btnRetry').style.display = 'none';
   show('levelend');
   stopMusic();
   showHud(false);
@@ -3788,6 +3807,12 @@ function gameOver(){
   $('btnNext').onclick = () => {
     saveRecord($('nameInput').value || 'Безымянный');
     hide('levelend'); show('menu'); state = 'menu'; setMusicMode('menu'); startMusic(); refreshMenu(); updateTouchVisibility();
+  };
+  // после смерти можно сразу начать заново, не уходя в меню
+  $('btnRetry').style.display = 'block';
+  $('btnRetry').onclick = () => {
+    saveRecord($('nameInput').value || 'Безымянный');
+    sfx('click'); hide('levelend'); startGame();
   };
   show('levelend'); stopMusic(); showHud(false); updateTouchVisibility();
 }
@@ -4566,7 +4591,8 @@ function render(){
     if (en.maxHp > 40 && !en.boss){
       const w2 = en.scale*.9;
       ctx.fillStyle='#2a1a1a'; ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2, 5);
-      ctx.fillStyle='#c0392b'; ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2*(en.hp/en.maxHp), 5);
+      ctx.fillStyle = en.elite ? ((ELITES[en.elite] || {}).color || '#b06bff') : '#c0392b';
+      ctx.fillRect(ex-w2/2, ey-en.scale/2-12, w2*(en.hp/en.maxHp), 5);
     }
   }
 
@@ -4893,7 +4919,7 @@ function drawHud(){
       cfg.title,
       cfg.hint + (prog ? '  (' + prog + ')' : ''),
       'УПРАВЛЕНИЕ: WASD или стик — идти · мышь или правый стик — прицел · ЛКМ или RT — огонь · Esc — пауза',
-      'Кнопки сверху справа: пауза, звуки, музыка, режим стрельбы ◎, полный экран'
+      'Кнопки сверху по центру: пауза, звуки, музыка, режим стрельбы ◎, полный экран'
     ];
     const boxW = Math.min(W - 16, 820);
     const fsz = W < 700 ? 13 : 15;
@@ -4940,6 +4966,15 @@ function drawHud(){
   ctx.textAlign='center'; ctx.fillStyle='#7b8996'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
   ctx.fillText(`УРОВЕНЬ ГЕРОЯ ${plvl}`, W/2, xy-5);
   ctx.textAlign='left';
+
+  // красная виньетка: удар по герою должен читаться сразу
+  if (P.iframe > .45){
+    const a = Math.min(1, (P.iframe - .45) / .25) * .55;
+    const gr = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*.34, W/2, H/2, Math.max(W,H)*.62);
+    gr.addColorStop(0, 'rgba(190,30,20,0)');
+    gr.addColorStop(1, 'rgba(190,30,20,' + a.toFixed(3) + ')');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  }
 }
 
 // ================= ЦИКЛ =================
