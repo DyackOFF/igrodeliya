@@ -1472,7 +1472,7 @@ let forceTouch = null;
 function resetGame(){
   P = {x:0,y:0,hp:100,maxHp:100,speed:210,dmgMul:1,rateMul:1,extraShots:0,pierce:0,
        ricochet:false,crit:0,armor:0,xpMul:1,regen:0,thorns:0,vamp:0,homing:0,boom:0,
-       shieldMax:0,shield:0,shieldT:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
+       shieldMax:0,shield:0,shieldT:0,shieldFx:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
        gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0, wound:0,
        projMul:1, webImmune:false, orbMul:1, vx:0, vy:0, lavaT:0, surfaceImmune:false};
@@ -2249,6 +2249,7 @@ const CHANGELOG = [
     'На экране смерти появилась кнопка «Заново» — сразу новый забег, без похода в меню.',
     'Яд понерфил: облака больше не суммируются — один тик урона на моба в 0.3 с, шлейф бьёт 6 (+2 за стак яда), а отравление тикает слабее.',
     'Отравленного врага теперь видно: зелёный ореол и пузырьки.',
+    'Щит стало видно: сердце и HP в одной панели, под полоской — заряды щита с полоской восстановления, а вокруг героя светится купол (и вспыхивает, когда щит гасит удар).',
     'Забег ставится на паузу сам, если свернуть вкладку или уйти с экрана.',
     'Главное меню собрано компактнее: Играть, Магазин, Обучение + две плитки — Бестиарий и Настройки. Рекорды теперь внутри бестиария, «Управление» — внутри настроек, а справа сверху появилась кнопка «на весь экран».',
     'Починил «Дальше» на телефонах: после смерти кнопка снова ведёт на следующий уровень, экраны прокручиваются, кнопка не уезжает за край.'
@@ -2803,6 +2804,7 @@ function update(dt){
     }
   }
   if (P.iframe > 0) P.iframe -= dt;
+  if (P.shieldFx > 0) P.shieldFx -= dt;
   if (tutorial) P.hp = P.maxHp;
   if (P.wound > 0) P.wound -= dt;
   if (P.regen && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.regen*dt);
@@ -3739,7 +3741,9 @@ function hurtPlayer(dmg, melee){
   // «Шипастая броня»: −10% урона в ближнем бою за стак
   if (melee && P.thorns) dmg *= 1 - Math.min(.3, .10*P.thorns);
   sfx('hurt');
-  if (P.shield > 0){ P.shield--; P.iframe = .4; parts.push({x:P.x,y:P.y,life:.3,max:.3,kind:'hurt'}); return; }
+  if (P.shield > 0){ P.shield--; P.shieldFx = .35; P.iframe = .4;
+    parts.push({x:P.x,y:P.y,life:.35,max:.35,kind:'shock',size:70});
+    sfx('click'); return; }
   P.hp -= dmg*(1-Math.min(.8,P.armor));
   P.iframe = .7;
   P.wound = 3;                       // «рана»: реген и вампиризм молчат 3 с
@@ -4664,6 +4668,17 @@ function render(){
     ctx.fillStyle = '#b6d43a';
     ctx.beginPath(); ctx.arc(P.x-cam.x+Math.cos(a)*70, P.y-cam.y+Math.sin(a)*70, 7, 0, 6.3); ctx.fill();
   }
+  // щит героя: пока заряды есть, вокруг виден купол
+  if (P.shield > 0){
+    const shR = 26 + (P.shieldFx > 0 ? 10*Math.min(1, P.shieldFx/.35) : 0);
+    ctx.globalAlpha = .30 + (P.shieldFx > 0 ? .5*Math.min(1, P.shieldFx/.35) : 0);
+    ctx.strokeStyle = '#8ef0ff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(P.x-cam.x, P.y-cam.y, shR, 0, 6.3); ctx.stroke();
+    ctx.globalAlpha = .10 + (P.shieldFx > 0 ? .22 : 0);
+    ctx.fillStyle = '#8ef0ff';
+    ctx.beginPath(); ctx.arc(P.x-cam.x, P.y-cam.y, shR, 0, 6.3); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   if (!(P.iframe > 0 && Math.floor(P.iframe*20)%2 === 0)){
     const k = 'h_'+P.dir+(P.moving?(Math.floor(P.t*7)%2):0);
     const im = IMG[k] || IMG.h_down0;
@@ -4882,17 +4897,52 @@ function drawWeaponArt(id){
 
 function drawHud(){
   const fs1 = W < 700 ? 12 : 15, fs2 = W < 700 ? 11 : 13;
-  const bw = Math.min(280, W*.32), bh = W < 700 ? 16 : 20, bx = 18, by = 16;
-  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(bx-2,by-2,bw+4,bh+4);
+  const bx = 56, by = 16;
+  const bw = Math.min(260, W*.34), bh = W < 700 ? 16 : 20;
+  const sMax = P.shieldMax || 0, sRow = sMax ? 11 : 0;
+  // общая подложка: сердце, HP и заряды щита в одной панели
+  ctx.fillStyle='rgba(8,12,7,.62)';
+  ctx.fillRect(bx-44, by-14, bw+58, bh + 26 + sRow);
+  ctx.strokeStyle='rgba(182,212,58,.22)'; ctx.lineWidth=1;
+  ctx.strokeRect(bx-44, by-14, bw+58, bh + 26 + sRow);
+  // сердце рисуем вектором: ассет 16×16 на тёмной панели не читался
+  {
+    const hx = bx-26, hy = by+9, hs = 11;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy + hs*0.9);
+    ctx.bezierCurveTo(hx - hs*1.4, hy - hs*0.3, hx - hs*0.5, hy - hs*1.2, hx, hy - hs*0.45);
+    ctx.bezierCurveTo(hx + hs*0.5, hy - hs*1.2, hx + hs*1.4, hy - hs*0.3, hx, hy + hs*0.9);
+    ctx.closePath();
+    ctx.fillStyle = '#e8574a'; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.beginPath(); ctx.ellipse(hx - hs*0.4, hy - hs*0.35, hs*0.28, hs*0.2, -.6, 0, 6.3); ctx.fill();
+  }
+
   ctx.fillStyle='#3a1b1b'; ctx.fillRect(bx,by,bw,bh);
   const g = ctx.createLinearGradient(bx,0,bx+bw,0);
   g.addColorStop(0,'#c0392b'); g.addColorStop(1,'#e8574a');
   ctx.fillStyle=g; ctx.fillRect(bx,by,bw*Math.max(0,P.hp/P.maxHp),bh);
   ctx.strokeStyle='#1c1414'; ctx.lineWidth=2; ctx.strokeRect(bx,by,bw,bh);
-  if (IMG.heart) ctx.drawImage(IMG.heart, bx-34, by-4, 30, 30);
+
+  // заряды щита: заполненные сегменты + полоска восстановления следующего
+  if (sMax){
+    const pipW = Math.min(20, (bw - 6*(sMax-1)) / sMax), py = by + bh + 5;
+    for (let i = 0; i < sMax; i++){
+      const px2 = bx + i*(pipW + 6);
+      ctx.fillStyle = i < P.shield ? '#8ef0ff' : 'rgba(142,240,255,.16)';
+      ctx.fillRect(px2, py, pipW, 5);
+      if (i < P.shield){ ctx.fillStyle='rgba(255,255,255,.55)'; ctx.fillRect(px2, py, pipW, 1.5); }
+    }
+    if (P.shield < sMax){
+      const need = Math.max(6, 12 - 2*sMax), k = Math.min(1, (P.shieldT || 0)/need);
+      ctx.fillStyle='rgba(15,30,35,.85)'; ctx.fillRect(bx, py+7, bw, 3);
+      ctx.fillStyle='#8ef0ff'; ctx.fillRect(bx, py+7, bw*k, 3);
+    }
+  }
 
   // панель оружия под HP
-  const wy = by + bh + 10;
+  const wy = by + bh + 18 + sRow;
   const wW = 232, wH = 54;
   ctx.fillStyle = 'rgba(8,12,7,.72)';
   ctx.fillRect(bx-2, wy, wW, wH);
@@ -4917,10 +4967,6 @@ function drawHud(){
   ctx.textAlign = 'left';
   ctx.font = '600 ' + fs1 + 'px "Segoe UI", sans-serif'; ctx.textAlign='left'; ctx.fillStyle='#e2e9ef';
   ctx.fillText(`${Math.max(0,Math.ceil(P.hp))} / ${P.maxHp}`, bx+8, by+13);
-  if (P.shield > 0){
-    ctx.fillStyle='#8ef0ff'; ctx.font = '600 ' + fs2 + 'px "Segoe UI", sans-serif';
-    ctx.fillText('◌'.repeat(P.shield), bx+bw+10, by+13);
-  }
   const L = LEVELS[lvl];
   ctx.textAlign='right'; ctx.fillStyle='#9fb0be';
   ctx.fillText(tutorial ? 'Обучение' : `Уровень ${lvl+1}/${TOT} · ${L.biomeName}`, W-18, 30);
