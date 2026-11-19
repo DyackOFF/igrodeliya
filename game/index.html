@@ -1323,7 +1323,7 @@ const WEAPONS = {
   minigun: {name:'Миниган',       note:'Огромный магазин, шквал пуль',           dmg:5,  delay:.055,speed:800, count:1, spread:.14, price:1200},
   sniper:  {name:'Снайперка',     note:'Высокий урон, пробивает 3 врагов',       dmg:48, delay:1.05,speed:1250,count:1, spread:0, pierce:3, price:1500},
   rocket:  {name:'Ракетница',     note:'Взрыв по площади',                      dmg:30, delay:.95, speed:440, count:1, spread:0, rocket:true, price:1800},
-  grenade: {name:'Гранатомёт',    note:'Граната: отскоки от стен, взрыв по касанию или фитилю', dmg:38, delay:1.15,speed:330, count:1, spread:.05, rocket:true, grenade:true, aoe:110, fuse:1.4, bounces:3, price:2200},
+  grenade: {name:'Гранатомёт',    note:'Граната: отскок от стен, взрыв по касанию или фитилю. Не наводится и не рикошетит', dmg:38, delay:1.15,speed:330, count:1, spread:.05, rocket:true, grenade:true, aoe:110, fuse:2, bounces:3, price:2200},
   plasma:  {name:'Плазмаган',     note:'Плотные сгустки, пробивают 2 врагов',    dmg:24, delay:.52, speed:620, count:1, spread:.03, pierce:2, price:3000},
   cryo:    {name:'Криопушка',     note:'Замедляет всех, в кого попала',          dmg:14, delay:.42, speed:700, count:1, spread:.06, freeze:true, price:3500},
   railgun: {name:'Рельса',        note:'Пробивает 8 врагов насквозь',            dmg:70, delay:1.30, speed:1600,count:1, spread:0, pierce:8, thin:true, price:4500},
@@ -1335,7 +1335,7 @@ const WEAPON_ORDER = ['pistol','dual','smg','shocker','shotgun','minigun','snipe
 const RELOAD = {
   pistol:[12,1.1], dual:[18,1.3], smg:[30,1.6], shocker:[20,1.4],
   shotgun:[6,1.9], minigun:[60,2.4], sniper:[3,2.0], rocket:[4,2.3],
-  grenade:[2,2.4], plasma:[14,1.5], cryo:[16,1.4], railgun:[1,1.7], laser:[0,0]
+  grenade:[3,2.0], plasma:[14,1.5], cryo:[16,1.4], railgun:[1,1.7], laser:[0,0]
 };
 const magOf = id => (RELOAD[id] ? RELOAD[id][0] : 0);const reloadOf = id => (RELOAD[id] ? RELOAD[id][1] : 0);
 function magCapacity(){
@@ -2250,7 +2250,8 @@ const CHANGELOG = [
     'Вампиризм: +1% за стак, стаков теперь 5. «Кровавый камень» — +5% вместо +6%.',
     '«Шипы» стали «Шипастой бронёй»: −10% урона в ближнем бою, а коснувшийся враг отлетает и замирает на 1 с (кроме боссов).',
     'Орбиты теперь защищают: вражеские снаряды, попавшие в шар, заметно замедляются.',
-    'Гранатомёт стал гранатой: отскакивает от стен до 3 раз, взрывается по касанию с мобом или по фитилю 1.4 с, урон полный.',
+    'Гранатомёт стал гранатой: отскакивает от стен до 3 раз, взрывается по касанию с мобом или по фитилю 2 с, урон полный, магазин на 3. Самонаведение и рикошет на гранату не действуют.',
+    'Граната рвётся всегда: о ледяную стену, кокон Паучихи и могилу тоже, а от стойки голема отлетает как от стены. Сектор Щитоносца взрыв обходит — это его контра.',
     'Костяной владыка переделан: девять взрывающихся черепов кольцом, телеграф, залп. Погиб последний — через секунду новая девятка.',
     'Рикошет теперь честный: пуля отражается по касательной от стены, а не отлетает назад. Не больше двух отскоков.',
     'Кнопки паузы и звука переехали наверх в центр — раньше они наезжали на строку «Уровень N/36 · босс».',
@@ -2350,7 +2351,7 @@ const MOB_DESC = {
 const ELITE_DESC = {
   fat:'HP как у мини-босса, при смерти распадается на слизней', weaver:'Паутина шире и −75% скорости',
   hunter:'Рывок к герою раз в 3 с после телеграфа', fire:'Взрыв 150 + горящая зона 3 с',
-  shield:'Сектор спереди гасит 80% урона', sniper:'Лазерная наводка, затем снаряд на 30'
+  shield:'Сектор спереди гасит 80% урона, но взрыв по площади обходит щит', sniper:'Лазерная наводка, затем снаряд на 30'
 };
 const BOSS_DESC = {
   summon:'Призывает слуг и бьёт по площади', shoot:'Держит дистанцию, стреляет веером',
@@ -2903,7 +2904,7 @@ function update(dt){
       const a = P.orbA + k*(Math.PI*2/P.orbs);
       const ox = P.x+Math.cos(a)*70, oy = P.y+Math.sin(a)*70;
       for (const en of enemies){
-        if (en.orbHit <= 0 && en.inv <= 0 && Math.hypot(en.x-ox, en.y-oy) < en.r+10){
+        if (en.orbHit <= 0 && !(en.inv > 0) && Math.hypot(en.x-ox, en.y-oy) < en.r+10){
           en.hp -= 14*P.dmgMul*(P.orbMul||1) * (en.armorElite ? 1 - en.armorElite : 1); en.flash = .1; en.orbHit = .35;
         }
       }
@@ -2925,13 +2926,18 @@ function update(dt){
       }
     }
     // граната летит тяжело: скорость быстро гаснет
-    if (b.grenade){ const gk = Math.pow(0.55, dt); b.vx *= gk; b.vy *= gk; }
+    if (b.grenade){ const gk = Math.pow(0.75, dt); b.vx *= gk; b.vy *= gk; }
     b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt;
     // ледяные стены королевы гасят снаряды
     if (iceWalls.length){
       let blocked = false;
       for (const w of iceWalls) if (Math.hypot(b.x-w.x, b.y-w.y) < w.r){ blocked = true; break; }
-      if (blocked){ parts.push({x:b.x, y:b.y, life:.16, max:.16, kind:'hit'}); bullets.splice(i,1); continue; }
+      if (blocked){
+        parts.push({x:b.x, y:b.y, life:.16, max:.16, kind:'hit'});
+        // граната детонирует и о ледяную стену — терять взрыв нельзя
+        if (b.grenade && b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
+        bullets.splice(i,1); continue;
+      }
     }
     if (b.life <= 0){
       if (b.grenade && b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
@@ -2985,6 +2991,8 @@ function update(dt){
           parts.push({x:g.x, y:g.y, life:.4, max:.4, kind:'death', size:50});
           sfx('kill');
         }
+        // граната рвётся и о могилу
+        if (b.grenade && b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
         if (b.pierce > 0){ b.pierce--; b.dmg *= (b.fall || 0.7); } else { bullets.splice(i,1); gone = true; }
         break;
       }
@@ -2996,6 +3004,8 @@ function update(dt){
         if (en.cocoon){
           parts.push({x:b.x,y:b.y,life:.12,max:.12,kind:'hit'});
           b.hit.add(en);
+          // граната рвётся и о кокон: взрыв уходит по паукам вокруг
+          if (b.grenade && b.aoe) explode(b.x, b.y, b.dmg, b.aoe);
           if (b.pierce > 0) b.pierce--; else { bullets.splice(i,1); gone = true; }
           break;
         }
@@ -3010,6 +3020,15 @@ function update(dt){
           const toB = Math.atan2(b.y - en.y, b.x - en.x);
           const front = Math.abs(((toB - en.face + Math.PI*3) % (Math.PI*2)) - Math.PI) < 1.1;
           if (en.stance && front){
+            // граната не детонирует о стойку, а отлетает как от стены — механику голема не ломаем
+            if (b.grenade){
+              b.vx *= -1.25; b.vy *= -1.25;
+              b.bounces = Math.max(0, (b.bounces || 0) - 1);
+              b.x += b.vx*dt*2; b.y += b.vy*dt*2;
+              parts.push({x:b.x, y:b.y, life:.16, max:.16, kind:'hit'});
+              sfx('hit');
+              break;
+            }
             hurtPlayer(b.dmg*.5);
             parts.push({x:b.x, y:b.y, life:.16, max:.16, kind:'hit'});
             bullets.splice(i,1); gone = true;
@@ -3587,7 +3606,7 @@ function spawnBoneRing(en, phase2){
     for (let rr = 95; rr >= 40; rr -= 14){
       for (const off of [0, .2, -.2, .4, -.4, .65, -.65, .95, -.95]){
         const px = en.x + Math.cos(a+off)*rr, py = en.y + Math.sin(a+off)*rr;
-        if (canStand(px, py, 14) && !solidPx(px, py)){ pos = {x:px, y:py}; break outer; }
+        if (canStand(px, py, 20) && !solidPx(px, py)){ pos = {x:px, y:py}; break outer; }
       }
     }
     const e = spawnEnemy('skull', {x:pos.x, y:pos.y});
@@ -3809,7 +3828,7 @@ function hurtPlayer(dmg, melee){
 function explode(x,y,dmg,r,ignore){
   sfx('boom');
   parts.push({x,y,life:.3,max:.3,kind:'boom',size:r});
-  for (const en of enemies) if (en !== ignore && !en.cocoon && en.inv <= 0 && Math.hypot(en.x-x, en.y-y) < r+en.r){
+  for (const en of enemies) if (en !== ignore && !en.cocoon && !(en.inv > 0) && Math.hypot(en.x-x, en.y-y) < r+en.r){
     en.hp -= dmg * (en.armorElite ? 1 - en.armorElite : 1); en.flash = .12;
   }
 }
