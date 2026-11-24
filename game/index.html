@@ -533,7 +533,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.4.4 (24.11)';
+const VERSION = 'v1.4.5 (24.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -1781,7 +1781,18 @@ function spawnMiniBoss(kind, x, y, art, name, hpScale){
 // волна номер n (0..3) — пара боссов из пройденных биомов
 function spawnSkelWave(n, x, y){
   const pair = SKEL_WAVES[Math.min(n, SKEL_WAVES.length-1)];
-  pair.forEach((p, i) => spawnMiniBoss(p[1], x + (i ? 120 : -120), y, p[0], p[2], .1));
+  // слуги не должны появляться в стене — ищем свободный пол рядом
+  const spot = (i) => {
+    for (let t = 0; t < 12; t++){
+      const a = (i ? .5 : -2.6) + t*.9;
+      const d = 110 + t*14;
+      const px = x + Math.cos(a)*d, py = y + Math.sin(a)*d;
+      if (canStand(px, py, 24) && !solidPx(px, py)) return {x:px, y:py};
+    }
+    const r = randomFloorRing(120, 300);
+    return r || {x, y};
+  };
+  pair.forEach((p, i) => { const s = spot(i); spawnMiniBoss(p[1], s.x, s.y, p[0], p[2], .1); });
   toast = 'ФАЗА ' + (n+1) + ' · ' + pair.map(p => p[2]).join(' + ');
   toastT = 4;
   sfx('portal');
@@ -2409,6 +2420,9 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.4.5', title:'Червь ныряет', items:[
+    'Лавовый червь теперь по-настоящему уходит под землю: на месте остаётся нора с раскалённым краем и трещинами, червя затягивает вниз, а выныривает он уже под героем и только потом бьёт.'
+  ]},
   {v:'v1.4.4', title:'Боссы перерисованы', items:[
     'Скелет-владыка: тёмная броня, костяные наплечники с шипами, высокий венец, косы теперь держат костяные руки.',
     'Между фазами владыки на его месте встаёт могила: вокруг вылезают два слуги-босса и толпа мобов, могила заряжается убийствами (моб +1, босс +4), потом он выбирается из земли с руками вверх.',
@@ -3777,18 +3791,31 @@ function bossWorm(en, dt, d, ux, uy, fx, fy, sp){
       sfx('click');
     }
   } else if (en.wstate === 'telegraph' && en.wt >= 1){
-    en.x = en.teleX; en.y = en.teleY;
-    explode(en.x, en.y, en.dmg*.6, 110);
-    if (Math.hypot(P.x-en.x, P.y-en.y) < 120) hurtPlayer(en.dmg*.7);
-    parts.push({x:en.x, y:en.y, life:.4, max:.4, kind:'boom', size:110});
-    if (phase2){
-      const base = Math.atan2(P.y-en.y, P.x-en.x);
-      for (let k = -1; k <= 1; k++){
-        const a = base + k*.5;
-        ebullets.push({x:en.x, y:en.y, vx:Math.cos(a)*300, vy:Math.sin(a)*300, dmg:en.dmg*.5, life:2, fire:true});
+    // сначала уходит в землю на своём месте
+    en.wstate = 'dive'; en.wt = 0;
+  } else if (en.wstate === 'dive'){
+    en.diveK = Math.min(1, en.wt / .5);
+    if (Math.random() < .5) parts.push({x:en.x + (Math.random()-.5)*40, y:en.y + (Math.random()-.5)*30, life:.4, max:.4, kind:'hit'});
+    if (en.wt >= .5){
+      en.x = en.teleX; en.y = en.teleY;
+      en.wstate = 'emerge'; en.wt = 0;
+      explode(en.x, en.y, en.dmg*.6, 110);
+      if (Math.hypot(P.x-en.x, P.y-en.y) < 120) hurtPlayer(en.dmg*.7);
+      parts.push({x:en.x, y:en.y, life:.4, max:.4, kind:'boom', size:110});
+      if (phase2){
+        const base = Math.atan2(P.y-en.y, P.x-en.x);
+        for (let k = -1; k <= 1; k++){
+          const a = base + k*.5;
+          ebullets.push({x:en.x, y:en.y, vx:Math.cos(a)*300, vy:Math.sin(a)*300, dmg:en.dmg*.5, life:2, fire:true});
+        }
       }
     }
-    en.wstate = 'crawl'; en.wt = 0;
+  } else if (en.wstate === 'emerge'){
+    en.diveK = Math.max(0, 1 - en.wt / .55);
+    if (Math.random() < .6) parts.push({x:en.x + (Math.random()-.5)*46, y:en.y + (Math.random()-.5)*34, life:.45, max:.45, kind:'hit'});
+    if (en.wt >= .55){
+      en.diveK = 0; en.wstate = 'crawl'; en.wt = 0;
+    }
   }
 }
 
@@ -4852,8 +4879,29 @@ function drawSpiderBossShape(g, t, scale, o){
 
 // Лавовый червь: сегменты в S-изгибе, раскалённая пасть
 function drawWormShape(g, t, scale, o){
-  const k = scale/132;
+  const k = scale/132, dive = o.dive || 0;
   const ROCK = '#2e2018', ROCK_L = '#4a3226', LAVA = '#ff7a2a', LAVA2 = '#ffc25c';
+  // нора: тёмный провал с раскалённым краем
+  if (dive > 0){
+    g.fillStyle = 'rgba(6,4,3,' + (.92*dive).toFixed(2) + ')';
+    g.beginPath(); g.ellipse(0, 6*k, (18 + 26*dive)*k, (11 + 15*dive)*k, 0, 0, 6.3); g.fill();
+    g.strokeStyle = 'rgba(255,140,55,' + (.95*dive).toFixed(2) + ')'; g.lineWidth = 4*k;
+    g.beginPath(); g.ellipse(0, 6*k, (18 + 26*dive)*k, (11 + 15*dive)*k, 0, 0, 6.3); g.stroke();
+    g.fillStyle = 'rgba(255,150,60,' + (.45*dive).toFixed(2) + ')';
+    g.beginPath(); g.ellipse(0, 6*k, 14*k, 8*k, 0, 0, 6.3); g.fill();
+    g.strokeStyle = 'rgba(255,170,70,' + (.7*dive).toFixed(2) + ')'; g.lineWidth = 2*k;
+    for (let i = 0; i < 7; i++){
+      const a = i*0.9 + 0.3;
+      g.beginPath();
+      g.moveTo(Math.cos(a)*20*k, 6*k + Math.sin(a)*12*k);
+      g.lineTo(Math.cos(a)*(30 + 8*dive)*k, 6*k + Math.sin(a)*(18 + 5*dive)*k);
+      g.stroke();
+    }
+  }
+  // сам червь уходит в землю: опускается, ужимается и гаснет
+  g.save();
+  if (dive > 0){ g.translate(0, dive*24*k); g.scale(1 - dive*.55, 1 - dive*.55); g.globalAlpha = Math.max(0, 1 - dive*1.05); }
+
   // сегменты: панцирные плиты с лавовыми щелями
   for (let i = 7; i >= 1; i--){
     const r = (16 - i*1.5)*k;
@@ -4903,6 +4951,7 @@ function drawWormShape(g, t, scale, o){
   g.strokeStyle = `rgba(255,140,50,${(.35 + .15*Math.sin(t*3)).toFixed(2)})`;
   g.lineWidth = 2*k;
   g.beginPath(); g.arc(0, hy, 22*k + Math.sin(t*3)*2*k, 0, 6.3); g.stroke();
+  g.restore();
 }
 
 // Кристальный голем: плиты, ядро, окно трещин
@@ -5346,7 +5395,7 @@ function render(){
         drawEnemyShape(ctx, art, en.t, en.scale, {
           boss: true, speed: en.speed,
           charge: en.bossKind === 'charge' && en.windT > 0,
-          stance: !!en.stance, cracks: !!en.cracks
+          stance: !!en.stance, cracks: !!en.cracks, dive: en.diveK || 0
         });
         ctx.restore();
         if (en.bossKind === 'skelord'){
@@ -6142,5 +6191,8 @@ window.__game = {
 </script>
 </body>
 </html>
+
+
+
 
 
