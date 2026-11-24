@@ -243,6 +243,12 @@
 
   .hintbar{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);z-index:3;
     font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#46525d;pointer-events:none;text-align:center}
+  #padKb{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9;display:none;
+    grid-template-columns:repeat(11,1fr);gap:4px;padding:8px;max-width:min(600px,96vw);
+    background:rgba(10,14,9,.97);border:1px solid #2b3a20;border-radius:12px;box-shadow:0 10px 40px #000a}
+  #padKb.on{display:grid}
+  #padKb b{font:600 12px/1 system-ui,sans-serif;color:#cfe0a8;text-align:center;padding:7px 0;border-radius:6px;background:#161f11}
+  #padKb b.sel{background:#b6d43a;color:#10160a}
   .kbd-focus{outline:2px solid #b6d43a !important;outline-offset:2px;
     box-shadow:0 0 18px rgba(182,212,58,.45) !important}
 
@@ -527,7 +533,7 @@
 (() => {
 "use strict";
 
-const VERSION = 'v1.4.2 (20.11)';
+const VERSION = 'v1.4.3 (24.11)';
 let W = 960, H = 600;
 const TS = 48;
 const cvs = document.getElementById('c');
@@ -950,34 +956,77 @@ addEventListener('visibilitychange', () => {
 });
 
 // ================= ГЕЙМПАД =================
-let padFire = false, padPausePrev = false;
+let padFire = false;
 function readPad(){
   if (!navigator.getGamepads) return null;
   const pads = navigator.getGamepads();
   for (const g of pads){ if (g && g.connected) return g; }
   return null;
 }
+let padBtnPrev = {};
+const padHeld = (g, i) => !!(g.buttons[i] && g.buttons[i].pressed);
+function padEdge(g, i, key){
+  const now = padHeld(g, i), was = !!padBtnPrev[key];
+  padBtnPrev[key] = now;
+  return now && !was;
+}
+function axisEdge(on, key){
+  const was = !!padBtnPrev[key];
+  padBtnPrev[key] = on;
+  return on && !was;
+}
+
 function pollPad(){
   const g = readPad();
-  if (!g){ padFire = false; return; }
+  if (!g){ padFire = false; padAimOn = false; padBtnPrev = {}; setPadKb(false); return; }
   const ax = g.axes[0] || 0, ay = g.axes[1] || 0;
   if (Math.hypot(ax, ay) > 0.22){ input.moveX = ax; input.moveY = ay; }
   else if (input.moveX || input.moveY){ if (!pointers.size){ input.moveX = 0; input.moveY = 0; } }
 
+  // правый стик: и прицел, и огонь в его сторону
   const rx = g.axes[2] || 0, ry = g.axes[3] || 0;
-  if (Math.hypot(rx, ry) > 0.28){
-    input.aimActive = true;
-    input.aimX = rx; input.aimY = ry;
-  } else if (pointers.size === 0){
-    input.aimActive = false;
+  padAimOn = Math.hypot(rx, ry) > 0.28;
+  if (padAimOn){ padAimX = rx; padAimY = ry; aimSrc = 'pad'; }
+
+  // курок/А тоже стреляют
+  padFire = !!(g.buttons[7] && g.buttons[7].value > 0.3) || padHeld(g,0) || padAimOn;
+
+  const start = padEdge(g, 9, 'start');
+  const aBtn = padEdge(g, 0, 'a');
+  const bBtn = padEdge(g, 1, 'b');
+  const anyScreen = document.querySelector('.screen:not(.hidden)');
+
+  // ввод имени с контроллера — экранная клавиатура
+  const nameVis = (!$('levelend').classList.contains('hidden') && $('nameBox').style.display !== 'none')
+    || !$('final').classList.contains('hidden');
+  setPadKb(nameVis);
+
+  if (anyScreen){
+    if (padKbOn){
+      const cols = 11;
+      const up = padEdge(g,12,'du') || axisEdge(ay < -.55, 'au');
+      const dn = padEdge(g,13,'dd') || axisEdge(ay > .55, 'ad');
+      const lf = padEdge(g,14,'dl') || axisEdge(ax < -.55, 'al');
+      const rt = padEdge(g,15,'dr') || axisEdge(ax > .55, 'ar');
+      if (lf) padKbMove(-1, cols);
+      if (rt) padKbMove(1, cols);
+      if (up) padKbMove(-cols, cols);
+      if (dn) padKbMove(cols, cols);
+      if (aBtn) padKbPress();
+      if (bBtn) padKbErase();
+      if (start) { setPadKb(false); $('nameInput').blur(); $('nameInput2').blur(); }
+      return;
+    }
+    if (padEdge(g,12,'du') || axisEdge(ay < -.55, 'au')) kbdMove(-1);
+    if (padEdge(g,13,'dd') || axisEdge(ay > .55, 'ad')) kbdMove(1);
+    if (aBtn){
+      if (!$('drum').classList.contains('hidden')){ if (!autoChain) takeCard(); }
+      else kbdActivate();
+    }
+    if (bBtn || start) escapeScreen();
+    return;
   }
-
-  const fire = (g.buttons[7] && g.buttons[7].value > 0.3) || (g.buttons[0] && g.buttons[0].pressed);
-  padFire = !!fire;
-
-  const p = g.buttons[9] && g.buttons[9].pressed;
-  if (p && !padPausePrev) togglePause();
-  padPausePrev = !!p;
+  if (start && state === 'play') togglePause();
 }
 
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -1401,7 +1450,11 @@ const ITEMS = [
   {id:'ricochet',r:'epic',  ic:'↺', name:'Рикошет',           desc:'Пули отскакивают от стен', max:1, unique:true, apply:p=>p.ricochet=true},
   {id:'homing', r:'epic',   ic:'➹', name:'Самонаведение',     desc:'Пули подворачивают к врагам', max:1, unique:true, apply:p=>p.homing+=2},
   {id:'boom',   r:'epic',   ic:'✹', name:'Взрывные пули',     desc:'Каждая пуля бьёт по площади; ракете и гранате +30 к радиусу', max:1, unique:true, apply:p=>p.boom+=30},
-  {id:'bigshot',r:'epic',   ic:'●', name:'Крупный калибр',    desc:'+40% урон, но стрельба на 10% медленнее', max:1, unique:true, apply:p=>{p.dmgMul*=1.4;p.rateMul*=1.1;}}
+  {id:'bigshot',r:'epic',   ic:'●', name:'Крупный калибр',    desc:'+40% урон, но стрельба на 10% медленнее', max:1, unique:true, apply:p=>{p.dmgMul*=1.4;p.rateMul*=1.1;}},
+  {id:'fastbul',r:'common', ic:'⇢', name:'Быстрые пули',      desc:'Пули летят на 20% быстрее', max:3, apply:p=>p.projMul*=1.2},
+  {id:'coldhead',r:'rare',  ic:'◓', name:'Холодная голова',   desc:'15% шанс не потратить патрон', max:3, apply:p=>p.ammoSave=(p.ammoSave||0)+.15},
+  {id:'chain',  r:'epic',   ic:'⌁', name:'Цепная молния',     desc:'Попадание бьёт ещё 2 врагов рядом на 60% урона', max:2, apply:p=>p.chain=(p.chain||0)+2},
+  {id:'shards', r:'epic',   ic:'✧', name:'Осколки',           desc:'Убитый тобой враг взрывается осколками', max:2, apply:p=>p.shards=(p.shards||0)+1}
 ];
 
 const ARTIFACTS = [
@@ -1418,7 +1471,7 @@ const ARTIFACTS = [
   {id:'a_orbs',  ic:'◍', name:'Ожерелье',       desc:'+3 орбиты, урон орбит вдвое, снаряды врагов в шарах замедляются', apply:p=>{p.orbs+=3;p.orbMul*=2;}},
   {id:'a_poison',ic:'☠', name:'Желчь',          desc:'Сильный ядовитый шлейф за спиной',apply:p=>p.gasTrail=true},
   {id:'a_spring',ic:'⟲', name:'Пружина',        desc:'Перезарядка ×0.4 и +50% магазин',apply:p=>{p.reloadMul*=0.4;p.magMul*=1.5;}},
-  {id:'a_reroll',ic:'⏳', name:'Часы перемотки', desc:'Все прошлые барабаны крутятся заново', ultra:true, apply:p=>{p.rerollLeft = plvl;}}
+  {id:'a_reroll',ic:'⏳', name:'Часы перемотки', desc:'Все прошлые барабаны крутятся заново (до 10)', ultra:true, apply:p=>{p.rerollLeft = Math.min(plvl, 10);}}
 ];
 
 // ================= ВРАГИ =================
@@ -1492,7 +1545,8 @@ function resetGame(){
        shieldMax:0,shield:0,shieldT:0,shieldFx:0,slow:0,poison:0,knock:0,orbs:0,orbA:0,
        weapon:meta.weapon||'pistol',aim:0,cool:0,iframe:0,t:0,dir:'down',moving:false,goldMul:1,artifacts:{},
        gasTrail:false, gasT:0, ammo:0, reloadT:0, magMul:1, reloadMul:1, rerollLeft:0, wound:0,
-       projMul:1, webImmune:false, orbMul:1, vx:0, vy:0, lavaT:0, surfaceImmune:false};
+       projMul:1, webImmune:false, orbMul:1, vx:0, vy:0, lavaT:0, surfaceImmune:false,
+       ammoSave:0, chain:0, shards:0};
   P.maxHp += 15*upLvl('hp');
   P.hp = P.maxHp;
   P.ammo = magCapacity();
@@ -1765,7 +1819,10 @@ function rollItem(){
     }
   }
   const fallback = eligibleItems();
-  return {kind:'item', data: fallback[Math.floor(Math.random()*fallback.length)] || ITEMS[0]};
+  if (!fallback.length) return eligibleArtifacts().length
+    ? {kind:'artifact', data: eligibleArtifacts()[Math.floor(Math.random()*eligibleArtifacts().length)]}
+    : bonusCard();
+  return {kind:'item', data: fallback[Math.floor(Math.random()*fallback.length)]};
 }
 
 let reelAnimating = false;
@@ -1776,20 +1833,34 @@ function openDrum(){
   showHud(false);
   rerolls = 0;
   drumOpen = true;
+  autoChain = false;
+  $('btnTake').textContent = 'Забрать';
   $('drumTitle').textContent = 'Барабан · уровень ' + plvl;
   $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
   refreshDrumGold();
   show('drum');
   spinReel();
 }
-function rerollCost(){ return 20 + rerolls*15; }
+// каждый перекрут дороже предыдущего в 1.5 раза: 20, 30, 45, 68, 101…
+function rerollCost(){ return Math.ceil(20 * Math.pow(1.5, rerolls || 0)); }
 function refreshDrumGold(){
   const c = rerollCost(), enough = meta.gold >= c;
   $('drumGold').innerHTML = `Золото: <b>${meta.gold}</b> · перекрут <b style="color:${enough ? '#ffb340' : '#c0392b'}">${c}</b>` +
     (enough ? '' : ' <small style="color:#c0392b">не хватает ' + (c - meta.gold) + '</small>');
 }
 
-function spinReel(){
+// когда все перки и артефакты выбиты — в барабане только золото и лечение
+function bonusCard(){
+  const gold = bonusGold(), heal = bonusHeal();
+  return {kind:'bonus', data:{r:'common', id:'bonus', name:'Золото и лечение',
+    desc:`+${gold} золота и +${heal} HP`}};
+}
+const bonusGold = () => 60 + 30*plvl;
+const bonusHeal = () => Math.round(P.maxHp*.3);
+
+let autoChain = false;   // цепочка докруток «Часов перемотки» идёт сама
+
+function spinReel(quick){
   if (reelAnimating) return;
   reelAnimating = true;
   $('btnTake').disabled = true;
@@ -1798,9 +1869,10 @@ function spinReel(){
   $('resDesc').textContent = '';
 
   drumItem = rollItem();
+  const myItem = drumItem;
   const strip = $('strip');
   const rank = drumItem.kind === 'artifact' ? 3 : (drumItem.data.r === 'epic' ? 2 : drumItem.data.r === 'rare' ? 1 : 0);
-  const dur = [6000, 6600, 7200, 8400][rank];
+  const dur = quick ? 620 : [6000, 6600, 7200, 8400][rank];
   const TOTAL_CARDS = 96;
   const FINAL_IDX = 92;
   lastSpin = {rank, dur, idx: FINAL_IDX};
@@ -1810,13 +1882,15 @@ function spinReel(){
   for (let i = 0; i < TOTAL_CARDS; i++){
     if (i === FINAL_IDX) cards.push(drumItem);
     else {
+      // заполнители — только из того, что ещё не выбито, иначе лента врёт
       const r = rollRarity();
-      if (r === 'artifact'){
-        const arts = ARTIFACTS;
-        cards.push({kind:'artifact', data: arts[Math.floor(Math.random()*arts.length)]});
-      } else {
-        const pool = ITEMS.filter(x => x.r === r);
-        cards.push({kind:'item', data: pool[Math.floor(Math.random()*pool.length)] || ITEMS[0]});
+      const arts = eligibleArtifacts();
+      const pool = eligibleItems().filter(x => x.r === r);
+      if (r === 'artifact' && arts.length) cards.push({kind:'artifact', data: arts[Math.floor(Math.random()*arts.length)]});
+      else if (pool.length) cards.push({kind:'item', data: pool[Math.floor(Math.random()*pool.length)]});
+      else {
+        const fb = eligibleItems();
+        cards.push(fb.length ? {kind:'item', data: fb[Math.floor(Math.random()*fb.length)]} : bonusCard());
       }
     }
   }
@@ -1879,32 +1953,41 @@ function spinReel(){
     $('resName').style.textShadow = rank >= 2 ? `0 0 22px ${col}` : 'none';
     $('resDesc').textContent = d.desc || '';
     sfx(rank === 3 ? 'roll_artifact' : rank === 2 ? 'roll_epic' : rank === 1 ? 'roll_rare' : 'roll_common');
-    $('btnTake').disabled = false;
-    $('btnReroll').disabled = meta.gold < rerollCost();
+    $('btnTake').disabled = autoChain;
+    $('btnTake').textContent = autoChain ? 'Забираю…' : 'Забрать';
+    $('btnReroll').disabled = autoChain || meta.gold < rerollCost();
     $('btnReroll').textContent = 'Крутить ещё (' + rerollCost() + ')';
+    if (autoChain) setTimeout(() => { if (drumItem === myItem) takeCard(); }, 1000);
   }, dur + 90);
 }
 
-$('btnTake').onclick = () => {
+function takeCard(){
   if (!drumItem) return;
   sfx('take');
   if (drumItem.kind === 'artifact'){
     P.artifacts[drumItem.data.id] = true;
     drumItem.data.apply(P);
+  } else if (drumItem.kind === 'bonus'){
+    const g = bonusGold(), h = bonusHeal();
+    meta.gold += g; saveMeta();
+    P.hp = Math.min(P.maxHp, P.hp + h);
   } else {
     stacks[drumItem.data.id] = (stacks[drumItem.data.id]||0) + 1;
     drumItem.data.apply(P);
   }
   drumItem = null;
-  // «Часы перемотки»: крутим заново все барабаны, что были до этого
+  // «Часы перемотки»: докрутки идут сами и сами забираются
   if (P.rerollLeft > 0){
     P.rerollLeft--;
-    spinReel();
+    autoChain = true;
+    spinReel(true);
     return;
   }
+  autoChain = false;
   drumOpen = false;
   hide('drum'); state = 'play'; showHud(true);
-};
+}
+$('btnTake').onclick = () => takeCard();
 $('btnReroll').onclick = () => {
   const c = rerollCost();
   if (meta.gold < c) return;
@@ -1938,12 +2021,18 @@ function nearestEnemy(){
   }
   return best;
 }
+// откуда сейчас берётся прицел: пад > тач-стик > мышь > последний
+let aimSrc = 'mouse', padAimX = 0, padAimY = 0, padAimOn = false;
 function aimAngle(){
   if (mode === 'auto'){ const e = nearestEnemy(); if (e) return Math.atan2(e.y-P.y, e.x-P.x); return P.aim||0; }
+  if (padAimOn) return Math.atan2(padAimY, padAimX);
   if (input.aimActive) return Math.atan2(input.aimY, input.aimX);
-  // мышь задана в экранных координатах — переводим в мировые
-  const wx = mouse.x + (cam ? cam.x : 0), wy = mouse.y + (cam ? cam.y : 0);
-  return Math.atan2(wy - P.y, wx - P.x);
+  if (aimSrc === 'mouse'){
+    // мышь задана в экранных координатах — переводим в мировые
+    const wx = mouse.x + (cam ? cam.x : 0), wy = mouse.y + (cam ? cam.y : 0);
+    return Math.atan2(wy - P.y, wx - P.x);
+  }
+  return P.aim || 0;
 }
 const wantFire = () => mode === 'auto' ? true : (input.fireHeld || mouse.down || keys.has(' ') || padFire);
 
@@ -1976,7 +2065,7 @@ function shoot(){
       dmg: dmg*(isCrit?2.5:1), crit: isCrit,
       pierce: (w.rocket || w.grenade) ? 0 : (w.pierce || 0) + P.pierce, hit: new Set(),
       rocket: !!w.rocket, aoe: w.aoe ? w.aoe + (P.boom || 0) : w.rocket ? 70 + (P.boom || 0) : (P.boom ? 70 : 0),
-      freeze: !!w.freeze, chain: w.chain || 0,
+      freeze: !!w.freeze, chain: (w.chain || 0) + (P.chain || 0),
       thin: !!w.thin, life: w.grenade ? w.fuse : 2.4, r: w.thin?5:8, grace: .02,
       // граната: та же физика «взрыва по площади», но с отскоками и фитилём
       grenade: !!w.grenade, bounces: w.bounces || 0,
@@ -1988,8 +2077,11 @@ function shoot(){
   sfx('shoot');
   P.cool = w.delay * P.rateMul;
   if (mag > 0){
-    P.ammo--;
-    if (P.ammo <= 0) startReload();
+    if (P.ammoSave && Math.random() < P.ammoSave){ /* «Холодная голова»: патрон не тратится */ }
+    else {
+      P.ammo--;
+      if (P.ammo <= 0) startReload();
+    }
   }
 }
 
@@ -2032,7 +2124,15 @@ addEventListener('keyup', e => {
   if (e.code === 'Space') keys.delete(' ');
 });
 function canvasPos(cx, cy){ const r = cvs.getBoundingClientRect(); return {x:(cx-r.left)*(W/r.width), y:(cy-r.top)*(H/r.height)}; }
-cvs.addEventListener('mousemove', e => { const p = canvasPos(e.clientX, e.clientY); mouse.x=p.x; mouse.y=p.y; });
+// слушаем на window: события не теряются, если курсор над рамкой/оверлеем
+addEventListener('mousemove', e => {
+  // синтетическая мышь от тапов на телефоне не должна сбивать прицел
+  if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+  const p = canvasPos(e.clientX, e.clientY);
+  mouse.x = Math.max(0, Math.min(W, p.x));
+  mouse.y = Math.max(0, Math.min(H, p.y));
+  aimSrc = 'mouse';
+});
 cvs.addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; });
 addEventListener('mouseup', () => mouse.down = false);
 
@@ -2125,6 +2225,46 @@ function resetKbd(){
   kbdEl = null;
   const list = focusables();
   if (list.length) setKbd(list[0]);
+}
+
+// ---------- экранная клавиатура для контроллера ----------
+const PAD_KB = 'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789';
+const PAD_KB_SPEC = ['ПРОБЕЛ','СТЕРЕТЬ','ГОТОВО'];
+let padKbOn = false, padKbIdx = 0, padKbEl = null;
+const padKbCells = () => PAD_KB.split('').concat(PAD_KB_SPEC);
+function padKbBuild(){
+  if (padKbEl) return;
+  padKbEl = document.createElement('div'); padKbEl.id = 'padKb';
+  padKbCells().forEach(ch => { const b = document.createElement('b'); b.textContent = ch; padKbEl.appendChild(b); });
+  document.body.appendChild(padKbEl);
+}
+function padKbMark(){ if (padKbEl) [...padKbEl.children].forEach((b,i) => b.classList.toggle('sel', i === padKbIdx)); }
+function setPadKb(on){
+  if (!on && !padKbEl) return;
+  padKbBuild();
+  if (on === padKbOn) return;
+  padKbOn = on;
+  padKbEl.classList.toggle('on', on);
+  padKbMark();
+}
+function padKbMove(d){
+  const n = padKbCells().length;
+  padKbIdx = (padKbIdx + d + n) % n;
+  padKbMark();
+}
+const padKbField = () => !$('final').classList.contains('hidden') ? $('nameInput2') : $('nameInput');
+function padKbErase(){
+  const f = padKbField();
+  f.value = f.value.slice(0, -1);
+  f.dispatchEvent(new Event('input', {bubbles:true}));
+}
+function padKbPress(){
+  const ch = padKbCells()[padKbIdx], f = padKbField();
+  if (ch === 'ГОТОВО'){ f.dispatchEvent(new Event('input', {bubbles:true})); setPadKb(false); return; }
+  if (ch === 'СТЕРЕТЬ'){ padKbErase(); return; }
+  f.value = (f.value + (ch === 'ПРОБЕЛ' ? ' ' : ch)).slice(0, 14);
+  f.dispatchEvent(new Event('input', {bubbles:true}));
+  sfx('click');
 }
 function escapeScreen(){
   if (!$('settings').classList.contains('hidden')){
@@ -2257,6 +2397,14 @@ function refreshRecords(){
 // ===== ОБНОВЛЕНИЯ =====
 const BIG_UPDATE = true;
 const CHANGELOG = [
+  {v:'v1.4.3', title:'Барабан и прицел', items:[
+    'Барабан: каждый перекрут теперь дороже предыдущего в 1.5 раза (20, 30, 45…), а не на фиксированные 15 золота.',
+    'Выбитые перки больше не крутятся в ленте и не выпадают второй раз. Когда качать уже нечего, барабан даёт золото и лечение.',
+    '«Часы перемотки»: не больше 10 докруток, и идут они сами — по карточке примерно каждые 1.6 с, нажимать «Забрать» не нужно.',
+    'Четыре новых перка: «Быстрые пули», «Холодная голова», «Цепная молния» и «Осколки».',
+    'Прицел мышью снова слушается курсора: слежение не теряется, даже если курсор ушёл за край окна игры.',
+    'Контроллер: правый стик целится и стреляет, A — забрать карточку, Start — пауза, меню листается крестовиной, а имя можно набрать экранной клавиатурой.'
+  ]},
   {v:'v1.4.2', title:'Новые модельки', items:[
     'Герой перерисован вектором: сталкер в капюшоне и противогазе, 4 направления, бег, поворот по прицелу.',
     'Оружие теперь в руках: своя точка хвата, вторая кисть на цевье, отдача, у каждого своя длина и масштаб.',
@@ -3329,6 +3477,17 @@ function update(dt){
       if (P.vamp && P.wound <= 0) P.hp = Math.min(P.maxHp, P.hp + P.vamp*P.maxHp);
       gainXp(Math.round(en.xp * P.xpMul));
       parts.push({x:en.x, y:en.y, life:.35, max:.35, kind:'death', size:en.scale});
+      // «Осколки»: враг, убитый не осколками, разлетается по площади
+      if (P.shards && !en.noShard){
+        const sDmg = 12 * P.shards * P.dmgMul * (1 + lvl*.05);
+        parts.push({x:en.x, y:en.y, life:.25, max:.25, kind:'boom', size:80});
+        for (const o of enemies){
+          if (o === en || o.cocoon || o.inv > 0) continue;
+          if (Math.hypot(o.x-en.x, o.y-en.y) > 80 + o.r) continue;
+          o.hp -= sDmg * (o.boss ? .5 : 1) * (o.armorElite ? 1 - o.armorElite : 1);
+          o.flash = .12; o.noShard = true;
+        }
+      }
       if (en.poisonT > 0){
         clouds.push({x:en.x, y:en.y, r:68 + 14*(P.poison||1), life:2, max:2, tick:0, dmg:5 + 5*(P.poison||1)});
         sfx('poison');
@@ -5085,8 +5244,11 @@ function render(){
       const en = nearestEnemy();
       if (en){ tx = en.x - cam.x; ty = en.y - cam.y; }
       else { tx = P.x - cam.x + Math.cos(P.aim)*260; ty = P.y - cam.y + Math.sin(P.aim)*260; }
-    } else {
+    } else if (aimSrc === 'mouse' && !padAimOn){
       tx = mouse.x; ty = mouse.y;
+    } else {
+      // стик/тач: маркер по направлению прицела, а не по курсору
+      tx = P.x - cam.x + Math.cos(P.aim)*260; ty = P.y - cam.y + Math.sin(P.aim)*260;
     }
     const px0 = P.x - cam.x, py0 = P.y - cam.y;
 
@@ -5595,7 +5757,8 @@ let last = 0;
 function loop(now){
   const dt = Math.min((now-last)/1000 || 0, .05);
   last = now;
-  if (state === 'play'){ pollPad(); update(dt); }
+  pollPad();
+  if (state === 'play') update(dt);
   cvs.style.cursor = (state === 'play' && mode === 'manual') ? 'none' : 'default';
   if (state === 'play' || state === 'pause' || state === 'levelend' || state === 'over' || state === 'win' ||
       state === 'drum' || state === 'artifact') render();
@@ -5636,8 +5799,8 @@ window.__game = {
   get iceWalls(){ return iceWalls; }, get iceTiles(){ return iceTiles; }, get scythes(){ return scythes; },
   nearestEnemy, inSight, visionRange, VISION_R, solidAt, solidPx,
   get eliteLeft(){ return eliteLeft; }, set eliteLeft(v){ eliteLeft = v; }, ELITES, ELITE_LIST: Object.keys(ELITES),
-  setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum,
-  get lastSpin(){ return lastSpin; },
+  setMode, meta, META_UP, upLvl, refreshShop, refreshMenu, saveMeta, rollItem, openDrum, rerollCost, takeCard,
+  get lastSpin(){ return lastSpin; }, get drumItem(){ return drumItem; }, get rerollsN(){ return rerolls; },
   keyDown(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
     if (dir) keys.add(dir); },
   keyUp(code){ const dir = {KeyW:'up',KeyA:'left',KeyS:'down',KeyD:'right',ArrowUp:'up',ArrowLeft:'left',ArrowDown:'down',ArrowRight:'right'}[code];
@@ -5645,6 +5808,7 @@ window.__game = {
   setMouse(x,y,down){ mouse.x=x; mouse.y=y; mouse.down=!!down; },
   hurtPlayer, startReload, kbdMove, kbdActivate, escapeScreen, focusables, startTutLesson, startTutorial, spawnEnemy, gameOver, sadTrombone,
   debugSetKills(n){ kills = n; },
+  debugSetRerolls(n){ rerolls = n; },
   debugSetState(s){ state = s; }
 };
 })();
